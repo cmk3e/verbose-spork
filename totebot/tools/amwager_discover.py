@@ -147,9 +147,13 @@ async def run(track: str, out: Path, url: Optional[str], watch_s: int, headed: b
             return
         sent = None
         try:
-            posted = resp.request.post_data_json
-            if isinstance(posted, dict):
-                sent = {k: type(v).__name__ for k, v in posted.items()}  # field names only, never values
+            if not login:
+                # Public page, no credentials involved: keep the request itself (e.g. GraphQL queries).
+                sent = scrub(resp.request.post_data or "")[:6000] or None
+            else:
+                posted = resp.request.post_data_json
+                if isinstance(posted, dict):
+                    sent = {k: type(v).__name__ for k, v in posted.items()}  # field names only, never values
         except Exception:
             pass
         records.append({
@@ -314,10 +318,10 @@ async def run(track: str, out: Path, url: Optional[str], watch_s: int, headed: b
     lines += ["", "== Visible text on the track page (first 3000 chars) ==", visible[:3000]]
     ranked = sorted(records, key=lambda r: score(r["body"]), reverse=True)
     lines += ["", f"== Top data responses ({len(records)} captured) =="]
-    for r in ranked[:8]:
+    for r in ranked[:12]:
         lines.append(f"\n[score {score(r['body'])}] {r['method']} {r['status']} {r['url']}  ({len(r['body']) / 1024:.1f} KB)")
         if r.get("sent"):
-            lines.append(f"request fields: {r['sent']}")
+            lines.append(f"request: {r['sent']}")
         try:
             lines.append("shape: " + json.dumps(shape(json.loads(r["body"])))[:1500])
         except ValueError:
