@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Totebot</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --panel: #ffffff; --ink: #14171c; --muted: #646b76; --line: #dde1e6;
+    --accent: #1f6feb; --good: #1a7f37; --warn: #9a6700; --bad: #cf222e; --chip: #eef1f5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e1116; --panel: #161b22; --ink: #e6edf3; --muted: #8d96a0; --line: #2a313c;
+      --accent: #4493f8; --good: #3fb950; --warn: #d29922; --bad: #f85149; --chip: #21262d;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+  header { position: sticky; top: 0; z-index: 5; background: var(--panel); border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 12px; padding: 10px 16px; flex-wrap: wrap; }
+  header h1 { font-size: 20px; margin: 0; }
+  header .meta { color: var(--muted); font-size: 14px; }
+  header .spacer { flex: 1; }
+  main { display: grid; grid-template-columns: minmax(280px, 380px) 1fr; gap: 16px; padding: 16px; max-width: 1400px; margin: 0 auto; }
+  @media (max-width: 820px) { main { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; min-width: 0; }
+  h2 { font-size: 17px; margin: 0 0 10px; }
+  h3 { font-size: 15px; margin: 18px 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  button, .btn { font: inherit; border: 1px solid var(--line); background: var(--chip); color: var(--ink);
+    border-radius: 10px; padding: 10px 14px; min-height: 44px; cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.danger { color: var(--bad); }
+  button:disabled { opacity: .5; }
+  input, textarea, select { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+    border-radius: 8px; padding: 10px; width: 100%; min-height: 44px; }
+  textarea { font-family: ui-monospace, Menlo, monospace; font-size: 14px; min-height: 120px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 8px 0 4px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .row > * { flex: 1 1 120px; }
+  .race { display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--line);
+    border-radius: 10px; margin-bottom: 8px; cursor: pointer; }
+  .race.sel { outline: 2px solid var(--accent); }
+  .race .title { font-weight: 600; }
+  .race .sub { color: var(--muted); font-size: 13px; }
+  .race .mtp { margin-left: auto; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .badge { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--chip); color: var(--muted); }
+  .badge.ready { color: var(--warn); } .badge.published { color: var(--good); }
+  .badge.error, .badge.missed { color: var(--bad); }
+  .hot { color: var(--warn); } .now { color: var(--bad); }
+  pre.ticket { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 12px;
+    font: 15px/1.5 ui-monospace, Menlo, monospace; white-space: pre-wrap; overflow-x: auto; margin: 0; }
+  .tablewrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; font-variant-numeric: tabular-nums; }
+  th, td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+  th:nth-child(-n+2), td:nth-child(-n+2) { text-align: left; }
+  th { color: var(--muted); font-weight: 500; }
+  .pos { color: var(--good); } .neg { color: var(--muted); }
+  .empty { color: var(--muted); text-align: center; padding: 30px 10px; }
+  .log { font: 12px/1.5 ui-monospace, Menlo, monospace; color: var(--muted); max-height: 180px; overflow-y: auto; }
+  .err { color: var(--bad); }
+  details summary { cursor: pointer; padding: 8px 0; color: var(--accent); }
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--ink); color: var(--bg);
+    padding: 10px 16px; border-radius: 10px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 10; }
+  .toast.show { opacity: .95; }
+  .big { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Totebot</h1>
+  <span class="meta" id="clock"></span>
+  <span class="meta" id="cfg"></span>
+  <span class="spacer"></span>
+  <button id="alertsBtn" title="Play a sound when tickets publish">Sound: off</button>
+</header>
+
+<main>
+  <section>
+    <div class="panel">
+      <h2>Races</h2>
+      <div id="races"><div class="empty">No races yet. Add a card below.</div></div>
+    </div>
+
+    <div class="panel" style="margin-top:16px">
+      <h2>Add races</h2>
+      <form id="uploadForm">
+        <label>Card file (CSV or JSON)</label>
+        <input type="file" name="file" accept=".csv,.json,text/csv,application/json" required>
+        <div class="row">
+          <div><label>Track</label><input name="track" placeholder="AQU"></div>
+          <div><label>Race #</label><input name="race_number" inputmode="numeric" placeholder="5"></div>
+        </div>
+        <div class="row">
+          <div><label>Post time (track local)</label><input name="post_time" placeholder="1:45 PM"></div>
+          <div><label>Date</label><input name="date" type="date"></div>
+        </div>
+        <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="replace" value="true" style="width:auto;min-height:0"> Replace if it already exists</label>
+        <p class="meta" style="color:var(--muted);font-size:13px">Leave track / race / post blank if the CSV has those columns (a whole day in one file).</p>
+        <button class="primary" type="submit">Upload</button>
+      </form>
+    </div>
+  </section>
+
+  <section class="panel" id="detail">
+    <div class="empty">Select a race.</div>
+  </section>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let cfg = {}, races = [], selected = location.hash.slice(1) || null, detail = null;
+let soundOn = false, lastStatus = {};
+try { soundOn = localStorage.getItem("totebot.sound") === "1"; } catch (e) {}
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, opts);
+  if (!res.ok) {
+    let msg = res.status + " " + res.statusText;
+    try { const j = await res.json(); msg = j.detail || msg; } catch (e) {}
+    throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
+  }
+  return res.json();
+}
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2500); }
+function fmtTime(iso) {
+  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: cfg.timezone });
+}
+function mtpOf(r) { return (new Date(r.post_time) - Date.now()) / 60000; }
+function fmtMtp(m) {
+  if (m <= 0) return "POST";
+  if (m < 10) { const s = Math.floor(m * 60); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; }
+  return Math.round(m) + " MTP";
+}
+function mtpClass(m) { return m <= cfg.publish_mtp ? "now" : m <= cfg.fetch_mtp + 2 ? "hot" : ""; }
+const pct = (x, d = 1) => (x * 100).toFixed(d) + "%";
+const money = (x) => "$" + Number(x || 0).toLocaleString(undefined, { minimumFractionDigits: x < 1 && x > 0 ? 2 : 0, maximumFractionDigits: 2 });
+
+function beep() {
+  if (!soundOn) return;
+  try {
+    const ctx = beep.ctx || (beep.ctx = new (window.AudioContext || window.webkitAudioContext)());
+    [0, 0.25].forEach(t => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.frequency.value = 880; o.connect(g); g.connect(ctx.destination);
+      g.gain.setValueAtTime(0.2, ctx.currentTime + t); g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.2);
+      o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + 0.2);
+    });
+  } catch (e) {}
+}
+$("#alertsBtn").onclick = () => {
+  soundOn = !soundOn;
+  try { localStorage.setItem("totebot.sound", soundOn ? "1" : "0"); } catch (e) {}
+  $("#alertsBtn").textContent = "Sound: " + (soundOn ? "on" : "off");
+  beep();
+};
+$("#alertsBtn").textContent = "Sound: " + (soundOn ? "on" : "off");
+
+function renderList() {
+  const el = $("#races");
+  const visible = races.filter(r => mtpOf(r) > -60 || r.id === selected);
+  if (!visible.length) { el.innerHTML = '<div class="empty">No upcoming races. Add a card below.</div>'; return; }
+  el.innerHTML = visible.map(r => {
+    const m = mtpOf(r);
+    return `<div class="race ${r.id === selected ? "sel" : ""}" data-id="${esc(r.id)}">
+      <div><div class="title">${esc(r.track)} R${r.race_number}</div>
+      <div class="sub">${fmtTime(r.post_time)} · <span class="badge ${esc(r.status)}">${esc(r.status)}</span>
+      ${r.total_cost != null && r.status === "published" ? " · " + money(r.total_cost) : ""}</div></div>
+      <div class="mtp ${mtpClass(m)}">${fmtMtp(m)}</div></div>`;
+  }).join("");
+  el.querySelectorAll(".race").forEach(n => n.onclick = () => select(n.dataset.id));
+}
+
+function select(id) { selected = id; location.hash = id; renderList(); loadDetail(); }
+
+function renderDetail() {
+  const el = $("#detail");
+  const r = detail;
+  if (!r) { el.innerHTML = '<div class="empty">Select a race.</div>'; return; }
+  const m = mtpOf(r), t = r.tickets;
+  const showTickets = t && (r.status === "published" || r.status === "ready");
+  let html = `<div class="row" style="align-items:center">
+      <div style="flex:2 1 200px"><h2 style="margin:0">${esc(r.track)} Race ${r.race_number}</h2>
+      <div class="meta" style="color:var(--muted)">Post ${fmtTime(r.post_time)} · <span class="badge ${esc(r.status)}">${esc(r.status)}</span></div></div>
+      <div style="flex:1 1 120px;text-align:right"><div class="big ${mtpClass(m)}">${fmtMtp(m)}</div></div></div>`;
+  if (r.error) html += `<p class="err">${esc(r.error)}</p>`;
+
+  if (showTickets) {
+    html += `<h3>Tickets ${r.status === "ready" ? "(release at " + cfg.publish_mtp + " MTP)" : ""}</h3>
+      <pre class="ticket" id="ticketText">${esc(t.ticket_text)}</pre>
+      <div class="row" style="margin-top:8px"><button id="copyBtn">Copy tickets</button></div>
+      <p class="meta" style="color:var(--muted);font-size:13px">Total ${money(t.total_cost)} · tote pulled ${fmtTime(t.tote_taken_at)}
+      (${(( new Date(r.post_time) - new Date(t.tote_taken_at)) / 60000).toFixed(1)} MTP) · fundamentals: ${esc(t.fundamental_source)}
+      · overround ${t.overround}${t.pace ? " · pace: " + esc(t.pace.scenario) : ""}</p>`;
+    (t.notes || []).forEach(n => html += `<p class="meta" style="color:var(--warn);font-size:13px">${esc(n)}</p>`);
+    for (const [type, ex] of Object.entries(t.exotics || {})) {
+      html += `<p style="font-size:14px"><b>${esc(type)}</b>: ${ex.combos.length} combos · cost ${money(ex.cost)} · hit ${pct(ex.hit_probability)}
+        · exp. profit ${money(ex.expected_profit)} · ROI ${pct(ex.roi, 0)} <span style="color:var(--muted)">(${esc(ex.payout_source)})</span></p>`;
+      if (ex.combos.length) html += `<details><summary>All ${ex.combos.length} ${esc(type)} combos</summary><div class="tablewrap"><table>
+        <thead><tr><th>Combo</th><th></th><th>Model prob</th><th>Est. $1 payout</th><th>EV / $1</th></tr></thead><tbody>${ex.combos.map(c =>
+        `<tr><td>${esc(c.combo.join("-"))}</td><td></td><td>${pct(c.p_model, 2)}</td><td>${money(c["est_payout_per_$1"])}</td><td class="pos">+${pct(c["ev_per_$1"], 0)}</td></tr>`).join("")}</tbody></table></div></details>`;
+    }
+    html += `<h3>Field</h3><div class="tablewrap"><table><thead><tr><th>#</th><th>Horse</th><th>Odds</th><th>Public</th><th>Fund</th><th>Pace</th><th>True</th><th>EV</th><th>Stake</th></tr></thead><tbody>`;
+    t.runners.forEach(x => {
+      html += `<tr><td>${esc(x.program_num)}</td><td>${esc(x.name)}</td><td>${esc(x.odds_display)}</td><td>${pct(x.p_public)}</td>
+        <td>${pct(x.p_fund)}</td><td>${(x.pace_mod >= 0 ? "+" : "") + pct(x.pace_mod, 0)}</td><td><b>${pct(x.p_true)}</b></td>
+        <td class="${x.ev > 0 ? "pos" : "neg"}">${(x.ev >= 0 ? "+" : "") + pct(x.ev, 0)}</td><td>${x.recommended_stake >= 1 ? money(Math.floor(x.recommended_stake)) : ""}</td></tr>`;
+    });
+    html += `</tbody></table></div>
+      <p style="font-size:14px">A: ${esc(t.groups.A.join(", "))} · B: ${esc(t.groups.B.join(", "))} · C: ${esc(t.groups.C.join(", ") || "–")}</p>`;
+  } else {
+    html += `<p style="color:var(--muted)">Tote pulls at ${cfg.fetch_mtp} MTP; tickets release at ${cfg.publish_mtp} MTP.</p>`;
+  }
+
+  html += `<h3>Actions</h3><div class="row">
+      <button class="primary" id="runBtn">Pull tote &amp; run now</button>
+      <button id="postBtn">Change post time</button>
+      <button class="danger" id="delBtn">Delete</button></div>
+    <details><summary>Scratches</summary><div class="row">${r.runners.map(x =>
+      `<button data-scr="${esc(x.program_num)}" style="flex:0 0 auto${x.scratched ? ";text-decoration:line-through;color:var(--bad)" : ""}">#${esc(x.program_num)} ${esc(x.name)}</button>`).join("")}</div></details>
+    <details><summary>Enter odds by hand</summary>
+      <label>One per line: program number, then odds (5-2, 9/5, 3, SCR)</label>
+      <textarea id="oddsText" placeholder="1 5-2&#10;2 3&#10;3 9-5&#10;4 SCR">${esc(r.runners.filter(x => !x.scratched).map(x => x.program_num + " ").join("\n"))}</textarea>
+      <div class="row" style="margin-top:8px"><button class="primary" id="oddsBtn">Use these odds &amp; run</button></div>
+    </details>
+    <details><summary>Log</summary><div class="log">${r.log.slice().reverse().map(esc).join("<br>")}</div></details>`;
+  el.innerHTML = html;
+
+  const copy = $("#copyBtn");
+  if (copy) copy.onclick = async () => { try { await navigator.clipboard.writeText(t.ticket_text); toast("Copied"); } catch (e) { toast("Copy failed"); } };
+  $("#runBtn").onclick = () => act(`/api/races/${r.id}/run`, "Tickets ready");
+  $("#delBtn").onclick = async () => {
+    if (!confirm(`Delete ${r.track} R${r.race_number}?`)) return;
+    await act(`/api/races/${r.id}`, "Deleted", { method: "DELETE" });
+    selected = null; detail = null; location.hash = ""; renderDetail(); refresh();
+  };
+  $("#postBtn").onclick = () => {
+    const v = prompt("New post time (track local, e.g. 1:52 PM)", fmtTime(r.post_time));
+    if (v) act(`/api/races/${r.id}/post_time`, "Post time updated", jsonBody({ post_time: v }));
+  };
+  el.querySelectorAll("[data-scr]").forEach(b => b.onclick = () => act(`/api/races/${r.id}/scratch/${encodeURIComponent(b.dataset.scr)}`, "Updated"));
+  $("#oddsBtn").onclick = () => {
+    const win_odds = {};
+    for (const line of $("#oddsText").value.split("\n")) {
+      const parts = line.trim().split(/[\s,]+/);
+      if (parts.length >= 2 && parts[1]) win_odds[parts[0]] = parts.slice(1).join("");
+    }
+    if (Object.keys(win_odds).length < 2) { toast("Enter odds for at least 2 horses"); return; }
+    act(`/api/races/${r.id}/tote`, "Tickets ready", jsonBody({ win_odds, run: true }));
+  };
+}
+const jsonBody = (b) => ({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) });
+
+async function act(path, okMsg, opts = { method: "POST" }) {
+  try { const res = await api(path, opts); if (res && res.id) { detail = res; renderDetail(); } toast(okMsg); refresh(); }
+  catch (e) { toast(e.message); }
+}
+
+async function loadDetail() {
+  if (!selected) { detail = null; renderDetail(); return; }
+  try { detail = await api(`/api/races/${encodeURIComponent(selected)}`); }
+  catch (e) { detail = null; }
+  // don't clobber a half-typed odds entry
+  const ta = $("#oddsText");
+  if (ta && document.activeElement === ta) return;
+  if (document.querySelector("details[open]")) {
+    const open = [...document.querySelectorAll("details")].map(d => d.open);
+    renderDetail();
+    document.querySelectorAll("details").forEach((d, i) => d.open = open[i] || false);
+  } else renderDetail();
+}
+
+async function refresh() {
+  try {
+    races = await api("/api/races");
+    races.forEach(r => {
+      if (lastStatus[r.id] && lastStatus[r.id] !== "published" && r.status === "published") {
+        beep(); toast(`${r.track} R${r.race_number} tickets are up`);
+        if (!selected) select(r.id);
+      }
+      lastStatus[r.id] = r.status;
+    });
+    renderList();
+  } catch (e) { $("#races").innerHTML = `<div class="empty err">${esc(e.message)}</div>`; }
+}
+
+$("#uploadForm").onsubmit = async (ev) => {
+  ev.preventDefault();
+  const fd = new FormData(ev.target);
+  for (const k of ["track", "race_number", "post_time", "date"]) if (!fd.get(k)) fd.delete(k);
+  if (!fd.get("replace")) fd.delete("replace");
+  try {
+    const added = await api("/api/races/upload", { method: "POST", body: fd });
+    toast(`Added ${added.length} race${added.length === 1 ? "" : "s"}`);
+    ev.target.reset();
+    await refresh();
+    if (added.length) select(added[0].id);
+  } catch (e) { toast(e.message); }
+};
+
+function tickClock() {
+  $("#clock").textContent = new Date().toLocaleTimeString([], { timeZone: cfg.timezone, hour: "numeric", minute: "2-digit", second: "2-digit" });
+  renderList();
+  if (detail) { const big = $("#detail .big"); if (big) { const m = mtpOf(detail); big.textContent = fmtMtp(m); big.className = "big " + mtpClass(m); } }
+}
+
+(async function init() {
+  try { cfg = await api("/api/config"); } catch (e) { cfg = { fetch_mtp: 3, publish_mtp: 2 }; }
+  $("#cfg").textContent = `tote: ${cfg.tote_source} · bankroll ${money(cfg.bankroll)}`;
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: cfg.timezone });
+  $("#uploadForm [name=date]").value = today;
+  await refresh();
+  if (selected) loadDetail();
+  setInterval(tickClock, 1000);
+  setInterval(refresh, 5000);
+  setInterval(() => { if (selected) loadDetail(); }, 5000);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+program_num,name,style,qsp,call1_fps,call2_fps,final_fps,p_fund,ml_odds
+1,Iron Ledger,E,7,58,57,49,0.18,3-1
+2,Quiet Thunder,P,4,55,55,52,0.22,5-2
+3,Saratoga Mist,S,1,51,52,55,0.12,6-1
+4,Copper Kettle,E/P,6,57,56,50,0.15,4-1
+5,Lucky Lariat,P,3,54,54,51,0.10,8-1
+6,Northern Gale,S,2,52,53,54,0.13,5-1
+7,Dancing Ember,E,8,59,57,47,0.10,10-1

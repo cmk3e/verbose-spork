@@ -1,0 +1,15 @@
+{
+  "track": "AQU",
+  "race_number": 5,
+  "post_time": "2026-10-23T13:45:00-04:00",
+  "source_ref": "optional-provider-race-id",
+  "runners": [
+    {"program_num": "1", "name": "Iron Ledger", "style": "E", "qsp": 7, "call1_fps": 58, "call2_fps": 57, "final_fps": 49, "p_fund": 0.18, "ml_odds": "3-1"},
+    {"program_num": "2", "name": "Quiet Thunder", "style": "P", "qsp": 4, "call1_fps": 55, "call2_fps": 55, "final_fps": 52, "p_fund": 0.22, "ml_odds": "5-2"},
+    {"program_num": "3", "name": "Saratoga Mist", "style": "S", "qsp": 1, "call1_fps": 51, "call2_fps": 52, "final_fps": 55, "p_fund": 0.12, "ml_odds": "6-1"},
+    {"program_num": "4", "name": "Copper Kettle", "style": "E/P", "qsp": 6, "p_fund": 0.15, "ml_odds": "4-1"},
+    {"program_num": "5", "name": "Lucky Lariat", "style": "P", "qsp": 3, "p_fund": 0.10, "ml_odds": "8-1"},
+    {"program_num": "6", "name": "Northern Gale", "style": "S", "qsp": 2, "p_fund": 0.13, "ml_odds": "5-1"},
+    {"program_num": "7", "name": "Dancing Ember", "style": "E", "qsp": 8, "p_fund": 0.10, "ml_odds": "10-1"}
+  ]
+}

@@ -1,0 +1,15 @@
+[Unit]
+Description=Totebot live tote handicapper
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=totebot
+WorkingDirectory=/opt/totebot
+EnvironmentFile=/etc/totebot.env
+ExecStart=/opt/totebot/.venv/bin/python -m totebot
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,149 @@
+import asyncio
+import logging
+from collections import defaultdict
+from datetime import datetime
+from typing import Optional
+
+from . import notify
+from .config import Settings
+from .handicap import run_handicap
+from .models import Race, ToteSnapshot, utcnow
+from .sources import ToteSource, ToteUnavailable
+from .store import RaceStore
+
+log = logging.getLogger(__name__)
+
+POST_TIME_TOLERANCE_S = 30
+
+
+class RaceScheduler:
+    """Pulls the tote at FETCH_MTP, computes tickets, and releases them at PUBLISH_MTP.
+
+    Before the fetch window it pre-polls the source so a delayed post time moves the schedule.
+    """
+
+    def __init__(self, settings: Settings, store: RaceStore, source: ToteSource):
+        self.s = settings
+        self.store = store
+        self.source = source
+        self._locks = defaultdict(asyncio.Lock)
+        self._task: Optional[asyncio.Task] = None
+
+    def start(self) -> None:
+        self._task = asyncio.create_task(self._loop())
+
+    async def stop(self) -> None:
+        if self._task:
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
+        await self.source.aclose()
+
+    async def _loop(self) -> None:
+        while True:
+            try:
+                await self.tick()
+            except Exception:
+                log.exception("Scheduler tick failed")
+            await asyncio.sleep(self.s.tick_seconds)
+
+    async def tick(self, now: Optional[datetime] = None) -> None:
+        races = [r for r in self.store.all() if r.status in ("scheduled", "ready")]
+        await asyncio.gather(*(self._process(r, now) for r in races))
+
+    async def _process(self, race: Race, now: Optional[datetime]) -> None:
+        lock = self._locks[race.id]
+        if lock.locked():
+            return
+        async with lock:
+            now = now or utcnow()
+            mtp = race.mtp(now)
+            if race.status == "scheduled":
+                if mtp <= self.s.missed_after_mtp:
+                    race.status = "missed"
+                    race.note("Post passed before tote could be pulled", now)
+                    self.store.save(race)
+                elif mtp <= self.s.fetch_mtp:
+                    await self._snapshot_and_compute(race, now)
+                elif mtp <= self.s.prepoll_mtp and self._prepoll_due(race, now):
+                    await self._prepoll(race, now)
+            if race.status == "ready" and race.mtp(now) <= self.s.publish_mtp:
+                await self._publish(race, now)
+
+    def _prepoll_due(self, race: Race, now: datetime) -> bool:
+        return race.last_prepoll is None or (now - race.last_prepoll).total_seconds() >= self.s.prepoll_interval_s
+
+    def _apply_post_time(self, race: Race, snap: ToteSnapshot, now: datetime) -> None:
+        if snap.post_time and abs((snap.post_time - race.post_time).total_seconds()) > POST_TIME_TOLERANCE_S:
+            race.note(f"Post time moved {race.post_time:%H:%M}Z -> {snap.post_time:%H:%M}Z", now)
+            race.post_time = snap.post_time
+
+    async def _prepoll(self, race: Race, now: datetime) -> None:
+        race.last_prepoll = now
+        try:
+            snap = await self.source.fetch(race)
+            self._apply_post_time(race, snap, now)
+        except ToteUnavailable as e:
+            race.note(f"Pre-poll: {e}", now)
+        except Exception as e:
+            log.exception("Pre-poll failed for %s", race.id)
+            race.note(f"Pre-poll error: {e}", now)
+        self.store.save(race)
+
+    async def _snapshot_and_compute(self, race: Race, now: datetime) -> None:
+        try:
+            snap = await self.source.fetch(race)
+        except ToteUnavailable as e:
+            race.note(f"Tote unavailable, retrying: {e}", now)
+            self.store.save(race)
+            return
+        except Exception as e:
+            log.exception("Tote fetch failed for %s", race.id)
+            race.note(f"Tote fetch error, retrying: {e}", now)
+            self.store.save(race)
+            return
+
+        self._apply_post_time(race, snap, now)
+        if race.mtp(now) > self.s.fetch_mtp + 0.25:
+            self.store.save(race)  # post got pushed back; wait for the new window
+            return
+        await self._compute(race, snap, now)
+
+    async def _compute(self, race: Race, snap: ToteSnapshot, now: datetime) -> None:
+        race.snapshot = snap
+        try:
+            race.tickets = await asyncio.to_thread(run_handicap, race, snap, self.s)
+            race.status = "ready"
+            race.error = None
+            race.note(f"Tote pulled at {race.mtp(snap.taken_at):.1f} MTP; tickets computed", now)
+        except Exception as e:
+            log.exception("Handicapping failed for %s", race.id)
+            race.status = "error"
+            race.error = str(e)
+            race.note(f"Handicap error: {e}", now)
+            await notify.push(self.s, f"{race.track} R{race.race_number}: error", str(e), race.id, "default")
+        self.store.save(race)
+
+    async def _publish(self, race: Race, now: datetime) -> None:
+        race.status = "published"
+        race.note(f"Tickets published at {race.mtp(now):.1f} MTP", now)
+        self.store.save(race)
+        t = race.tickets or {}
+        cost = t.get("total_cost", 0)
+        await notify.push(
+            self.s, f"{race.track} R{race.race_number} tickets (${cost:,.2f})", t.get("ticket_text", ""), race.id
+        )
+
+    async def run_now(self, race: Race, snap: Optional[ToteSnapshot] = None) -> Race:
+        """Pull the tote (or use the given snapshot), compute and publish immediately."""
+        async with self._locks[race.id]:
+            now = utcnow()
+            if snap is None:
+                snap = await self.source.fetch(race)
+                self._apply_post_time(race, snap, now)
+            await self._compute(race, snap, now)
+            if race.status == "ready":
+                await self._publish(race, now)
+            return race
