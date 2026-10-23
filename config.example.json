@@ -1,0 +1,50 @@
+{
+  "provider": {
+    "type": "demo",
+    "n_races": 6,
+    "first_post_min": 4,
+    "spacing_min": 5
+  },
+
+  "_provider_http_example": {
+    "type": "http",
+    "races_url": "https://YOUR-FEED/races?date=today",
+    "tote_url": "https://YOUR-FEED/races/{race_id}/tote",
+    "headers": {"Authorization": "Bearer ${TOTE_API_KEY}"},
+    "adapter": "examples.adapter_example",
+    "numeric_format": "to1"
+  },
+
+  "_provider_file_example": {"type": "file", "directory": "examples/feed"},
+
+  "cards_dir": "cards",
+  "model_path": null,
+  "output_dir": "output",
+  "webhook_url": null,
+
+  "timing": {
+    "pull_at_sec": 180,
+    "ticket_at_sec": 120,
+    "tote_poll_sec": 15,
+    "race_refresh_sec": 60,
+    "reticket_if_delayed_sec": 60
+  },
+
+  "bankroll": {
+    "amount": 1000,
+    "fractional_kelly": 0.25,
+    "max_race_exposure": 0.05,
+    "odds_haircut": 0.05,
+    "win_min_bet": 2
+  },
+
+  "pace": {"fast_threshold": 20, "soft_threshold": 12},
+  "blend": {"alpha": 0.6, "beta": 0.4},
+
+  "exotics": {
+    "exacta":     {"enabled": true, "base": 1.0,  "budget": 20, "min_edge": 0.10, "min_combo_prob": 0.002},
+    "superfecta": {"enabled": true, "base": 0.10, "budget": 12, "min_edge": 0.10, "min_combo_prob": 0.0005}
+  },
+
+  "web": {"host": "127.0.0.1", "port": 8000}
+}

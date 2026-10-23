@@ -1,0 +1,11 @@
+{
+  "race_id": "AQU-2026-10-23-5",
+  "runners": [
+    {"program_num": "1", "name": "Alpha Ledger",  "style": "E",   "qsp": 7, "call1_fps": 58.1, "call2_fps": 56.9, "final_fps": 49.0, "p_fund": 0.22, "ml_odds": 3},
+    {"program_num": "2", "name": "Bravo Kick",    "style": "S",   "qsp": 1, "call1_fps": 52.0, "call2_fps": 53.2, "final_fps": 54.8, "p_fund": 0.18, "ml_odds": 4},
+    {"program_num": "3", "name": "Charlie Wire",  "style": "E/P", "qsp": 6, "call1_fps": 57.4, "call2_fps": 56.0, "final_fps": 50.5, "p_fund": 0.25, "ml_odds": 2.5},
+    {"program_num": "4", "name": "Delta Fraction","style": "P",   "qsp": 4, "call1_fps": 55.0, "call2_fps": 55.1, "final_fps": 51.9, "p_fund": 0.15, "ml_odds": 5},
+    {"program_num": "5", "name": "Echo Overlay",  "style": "P",   "qsp": 3, "call1_fps": 54.2, "call2_fps": 54.7, "final_fps": 52.2, "p_fund": 0.12, "ml_odds": 8},
+    {"program_num": "6", "name": "Foxtrot Late",  "style": "S",   "qsp": 0, "call1_fps": 51.1, "call2_fps": 52.5, "final_fps": 53.9, "p_fund": 0.08, "ml_odds": 12}
+  ]
+}
