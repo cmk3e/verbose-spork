@@ -297,6 +297,11 @@ $("#uploadForm").onsubmit = async (ev) => {
   const fd = new FormData(ev.target);
   for (const k of ["track", "race_number", "post_time", "date"]) if (!fd.get(k)) fd.delete(k);
   if (!fd.get("replace")) fd.delete("replace");
+  const btn = ev.target.querySelector("button[type=submit]");
+  const started = Date.now();
+  const tick = () => { btn.textContent = `Reading card… ${Math.round((Date.now() - started) / 1000)}s (big PDFs take a minute or two)`; };
+  btn.disabled = true; tick();
+  const timer = setInterval(tick, 1000);
   try {
     const res = await api("/api/races/upload", { method: "POST", body: fd });
     const added = res.races, skipped = res.skipped || [];
@@ -305,7 +310,8 @@ $("#uploadForm").onsubmit = async (ev) => {
     ev.target.reset();
     await refresh();
     if (added.length) select(added[0].id);
-  } catch (e) { toast(e.message); }
+  } catch (e) { alert("Upload failed: " + e.message); }
+  finally { clearInterval(timer); btn.disabled = false; btn.textContent = "Upload"; }
 };
 
 function tickClock() {
