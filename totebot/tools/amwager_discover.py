@@ -35,11 +35,28 @@ def load_env_file(path: str = ENV_FILE) -> None:
         lines = Path(path).read_text().splitlines()
     except OSError:
         return
+    values = {}
     for line in lines:
         line = line.strip()
         if line and not line.startswith("#") and "=" in line:
             k, v = line.split("=", 1)
-            os.environ.setdefault(k.strip(), v.strip())
+            values[k.strip()] = v.strip()  # last assignment wins, as with systemd
+    for k, v in values.items():
+        os.environ.setdefault(k, v)
+
+
+def credential_report(user: str, pw: str) -> str:
+    """Facts about the saved login that help spot typos, without revealing it."""
+    def quirks(v: str) -> str:
+        notes = []
+        if v != v.strip():
+            notes.append("has leading/trailing spaces")
+        if v[:1] in "'\"" or v[-1:] in "'\"":
+            notes.append("starts or ends with a quote character")
+        return ", ".join(notes) or "ok"
+
+    masked = (user[:2] + "***" + user[user.find("@"):]) if "@" in user else user[:2] + "***"
+    return f"Saved login: user {masked} ({quirks(user)}); password {len(pw)} chars ({quirks(pw)})"
 
 
 class Scrubber:
@@ -127,9 +144,16 @@ async def run(track: str, out: Path, url: Optional[str], watch_s: int, headed: b
             body = (await resp.body())[:MAX_BODY].decode("utf-8", "replace")
         except Exception:
             return
+        sent = None
+        try:
+            posted = resp.request.post_data_json
+            if isinstance(posted, dict):
+                sent = {k: type(v).__name__ for k, v in posted.items()}  # field names only, never values
+        except Exception:
+            pass
         records.append({
             "t": datetime.now(timezone.utc).isoformat(), "method": resp.request.method,
-            "status": resp.status, "url": scrub(resp.url), "ctype": ctype, "body": scrub(body),
+            "status": resp.status, "url": scrub(resp.url), "ctype": ctype, "body": scrub(body), "sent": sent,
         })
 
     def on_websocket(ws) -> None:
@@ -162,6 +186,7 @@ async def run(track: str, out: Path, url: Optional[str], watch_s: int, headed: b
         visible = ""
         try:
             say(f"AmWager discovery {datetime.now(timezone.utc):%Y-%m-%d %H:%M}Z  track={track!r}")
+            say(credential_report(user, pw))
             try:
                 await page.goto(start_url, wait_until="domcontentloaded", timeout=45_000)
             except Exception as e:
@@ -205,17 +230,29 @@ async def run(track: str, out: Path, url: Optional[str], watch_s: int, headed: b
             else:
                 if frame is not page.main_frame:
                     say(f"Login form is inside an iframe: {scrub(frame.url)[:150]}")
-                inputs = frame.locator("input:not([type=hidden]):not([type=password]):not([type=checkbox]):not([type=radio])")
-                user_box = None
-                for i in range(await inputs.count()):
-                    el = inputs.nth(i)
-                    if await el.is_visible():
-                        user_box = el  # last visible text-like input before submit is usually the username
+                user_box = await first_visible(frame.locator(
+                    "input[type=email], input[name*=mail i], input[id*=mail i], input[placeholder*=mail i], "
+                    "input[name*=user i], input[id*=user i], input[placeholder*=user i], input[autocomplete=username]"))
+                if user_box is None:
+                    # Fall back to the last visible text box that comes before the password box.
+                    inputs = frame.locator("input:not([type=hidden]):not([type=checkbox]):not([type=radio])")
+                    for i in range(await inputs.count()):
+                        el = inputs.nth(i)
+                        if await el.get_attribute("type") == "password":
+                            break
+                        if await el.is_visible():
+                            user_box = el
                 if user_box is None:
                     say("Login: no username field found")
                 else:
                     await user_box.fill(user)
                     await pw_box.fill(pw)
+                    attrs = [f"{a}={await user_box.get_attribute(a)!r}" for a in ("type", "name", "id", "placeholder")]
+                    say("Email box used: " + " ".join(attrs))
+                    typed_user = await user_box.input_value()
+                    typed_pw = await pw_box.input_value()
+                    say(f"Typed into form: email {'matches' if typed_user == user else 'DOES NOT match'} saved value; "
+                        f"password {'matches' if typed_pw == pw else 'DOES NOT match'} ({len(typed_pw)} chars)")
                     await snap(page, "2-login-filled")
                     await pw_box.press("Enter")
                     await page.wait_for_timeout(4000)
@@ -277,6 +314,8 @@ async def run(track: str, out: Path, url: Optional[str], watch_s: int, headed: b
     lines += ["", f"== Top data responses ({len(records)} captured) =="]
     for r in ranked[:8]:
         lines.append(f"\n[score {score(r['body'])}] {r['method']} {r['status']} {r['url']}  ({len(r['body']) / 1024:.1f} KB)")
+        if r.get("sent"):
+            lines.append(f"request fields: {r['sent']}")
         try:
             lines.append("shape: " + json.dumps(shape(json.loads(r["body"])))[:1500])
         except ValueError:
