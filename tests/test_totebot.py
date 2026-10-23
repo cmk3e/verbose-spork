@@ -224,3 +224,22 @@ def test_web_flow(tmp_path):
         assert c.post(f"/api/races/{rid}/scratch/7").json()["runners"][6]["scratched"] is True
         assert c.get("/").status_code == 200
         assert c.delete(f"/api/races/{rid}").status_code == 200
+
+
+def test_discovery_page(tmp_path):
+    from totebot.tools.amwager_discover import Scrubber
+
+    scrub = Scrubber("me@x.com", "hunter22")
+    assert scrub('{"accessToken":"abc","u":"me@x.com","p":"hunter22"}') == '{"accessToken":"***","u":"***","p":"***"}'
+    d = tmp_path / "discovery"
+    d.mkdir()
+    (d / "summary.txt").write_text("runners <odds>")
+    (d / "1-home.png").write_bytes(b"\x89PNG")
+    app = create_app(settings(tmp_path, password="pw"), start_scheduler=False)
+    with TestClient(app) as c:
+        assert c.get("/discovery").status_code == 401
+        c.auth = ("admin", "pw")
+        page = c.get("/discovery").text
+        assert "runners &lt;odds&gt;" in page and "/discovery/files/1-home.png" in page
+        assert c.get("/discovery/files/1-home.png").status_code == 200
+        assert c.get("/discovery/files/..%2Fraces").status_code == 404

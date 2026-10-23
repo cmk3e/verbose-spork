@@ -1,5 +1,7 @@
+import html
 import json
 import logging
+import re
 import secrets
 from contextlib import asynccontextmanager
 from datetime import timezone
@@ -8,7 +10,7 @@ from typing import Dict, List, Optional
 from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 
@@ -204,6 +206,40 @@ def create_app(settings: Optional[Settings] = None, start_scheduler: bool = True
         except ToteUnavailable as e:
             raise HTTPException(503, str(e))
         return race.to_dict()
+
+    discovery_dir = Path(settings.data_dir) / "discovery"
+
+    @app.get("/discovery", include_in_schema=False, dependencies=[Depends(auth)])
+    def discovery():
+        """Results of the last tote-source discovery run (see totebot/tools/)."""
+        summary = discovery_dir / "summary.txt"
+        if not summary.exists():
+            body = "<p>No discovery run yet.</p>"
+        else:
+            shots = sorted(p.name for p in discovery_dir.glob("*.png"))
+            body = (
+                '<button onclick="navigator.clipboard.writeText(document.getElementById(\'s\').innerText)'
+                '.then(()=>this.textContent=\'Copied\')">Copy summary</button>'
+                f'<pre id="s">{html.escape(summary.read_text())}</pre>'
+                + "".join(f'<h3>{n}</h3><img src="/discovery/files/{n}">' for n in shots)
+            )
+        return HTMLResponse(
+            '<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Discovery</title>'
+            "<style>body{font-family:-apple-system,system-ui,sans-serif;margin:16px;background:#fff;color:#111}"
+            "pre{white-space:pre-wrap;word-break:break-all;font-size:12px;background:#f3f4f6;padding:12px;border-radius:8px}"
+            "img{max-width:100%;border:1px solid #ccc}button{font:inherit;padding:10px 16px;min-height:44px}"
+            "@media (prefers-color-scheme:dark){body{background:#0e1116;color:#e6edf3}pre{background:#161b22}}</style>"
+            f"<h1>Discovery</h1>{body}"
+        )
+
+    @app.get("/discovery/files/{name}", include_in_schema=False, dependencies=[Depends(auth)])
+    def discovery_file(name: str):
+        if not re.fullmatch(r"[\w.-]+\.(png|txt|json|jsonl)", name):
+            raise HTTPException(404)
+        path = discovery_dir / name
+        if not path.is_file():
+            raise HTTPException(404)
+        return FileResponse(path)
 
     return app
 
