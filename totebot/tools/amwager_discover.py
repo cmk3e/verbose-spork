@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any, List, Optional
 
 ENV_FILE = "/etc/totebot.env"
-START_URL = "https://www.amwager.com/"
+START_URL = "https://pro.amwager.com/"
 MAX_BODY = 500_000
 
 ODDS_KEYS = re.compile(
