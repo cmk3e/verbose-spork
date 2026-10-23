@@ -1,3 +1,4 @@
+import asyncio
 import html
 import json
 import logging
@@ -122,7 +123,8 @@ def create_app(settings: Optional[Settings] = None, start_scheduler: bool = True
         data = await file.read()
         try:
             if data[:5] == b"%PDF-":
-                races = races_from_json(brisnet.parse_pdf(data), settings.timezone)
+                parsed = await asyncio.to_thread(brisnet.parse_pdf, data)  # big PDFs take a while
+                races = races_from_json(parsed, settings.timezone)
                 return add_races(races, replace)
             text = data.decode("utf-8-sig")
             if (file.filename or "").lower().endswith(".json") or text.lstrip().startswith(("{", "[")):
@@ -156,7 +158,7 @@ def create_app(settings: Optional[Settings] = None, start_scheduler: bool = True
         except (CardError, ValueError) as e:
             raise HTTPException(422, str(e))
         race.note(f"Post time set to {race.post_time:%H:%M}Z")
-        if race.status in ("missed", "error", "ready", "published") and race.mtp() > settings.fetch_mtp:
+        if race.status in ("missed", "error", "preview", "ready", "published") and race.mtp() > settings.fetch_mtp:
             race.status = "scheduled"
             race.note("Re-armed for a fresh tote pull")
         store.save(race)

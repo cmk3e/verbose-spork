@@ -5,8 +5,9 @@ from typing import Any, Dict, List, Optional
 
 # Race lifecycle:
 #   scheduled -> ready (tote pulled, tickets computed) -> published (tickets released)
+#   scheduled -> preview (manual early run; still pulled again at FETCH_MTP) -> ready -> published
 #   any -> error | missed
-STATUSES = ("scheduled", "ready", "published", "error", "missed")
+STATUSES = ("scheduled", "preview", "ready", "published", "error", "missed")
 
 
 def utcnow() -> datetime:

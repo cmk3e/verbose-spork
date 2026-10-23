@@ -24,7 +24,8 @@ TRACK_CODES = {
     "turfway park": "TP", "golden gate fields": "GG", "los alamitos": "LA", "remington park": "RP",
     "lone star park": "LS", "arlington park": "AP", "canterbury park": "CBY", "delaware park": "DEL",
 }
-RACE_TYPES = {"alw", "mdn", "clm", "oc", "stk", "hcp", "str", "msw", "moc", "aoc", "soc", "mcl", "wcl"}
+RACE_TYPES = {"alw", "mdn", "md", "mc", "clm", "oc", "stk", "hcp", "str", "msw", "moc", "aoc", "soc", "mcl", "wcl",
+              "s", "g1", "g2", "g3", "spwt", "mdspwt", "mdsp", "mcl", "trl", "fut", "dby", "oaks"}
 SMALL_WORDS = {"at", "the", "of", "de", "la", "a", "big"}
 
 HEADER = re.compile(r"Ultimate PP's w/ QuickPlay Comments (?P<rest>.+?)\s+"
@@ -43,7 +44,8 @@ def _track_name(rest: str) -> str:
     words = []
     for w in rest.split():
         clean = w.strip("™‘’'\"").lower()
-        if not w[:1].isalpha() or clean in RACE_TYPES or not (w[:1].isupper() or clean in SMALL_WORDS):
+        abbrev = len(clean) >= 2 and w.strip("™‘’'\"").isupper()  # race-type codes like MC, OC, AOC
+        if not w[:1].isalpha() or clean in RACE_TYPES or abbrev or not (w[:1].isupper() or clean in SMALL_WORDS):
             break
         words.append(w)
     return " ".join(words) or "TRACK"

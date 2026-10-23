@@ -215,7 +215,7 @@ def test_web_flow(tmp_path):
         r = c.post(f"/api/races/{rid}/tote", json={"win_odds": TOTE, "run": True})
         assert r.status_code == 200, r.text
         body = r.json()
-        assert body["status"] == "published"
+        assert body["status"] in ("preview", "published")  # preview unless inside the fetch window
         assert body["tickets"]["tote_source"] == "manual"
 
         r = c.post(f"/api/races/{rid}/run")
@@ -386,3 +386,35 @@ def test_brisnet_multi_track_pdf():
                          BRISNET_PAGE.format(race=4, post="2:49")])
     assert [(r["track"], r["race_number"], r["post_time"][11:16]) for r in races] == [
         ("KEE", 3, "13:35"), ("BEL", 3, "14:16"), ("BEL", 4, "14:49")]
+
+
+@pytest.mark.parametrize("rest,name", [
+    ("Belmont Park ™OC  80000n2x 6 Furlongs (t)", "Belmont Park"),
+    ("Keeneland MC 40000 6 Furlongs", "Keeneland"),
+    ("Belmont at the Big A Alw 100000n1x", "Belmont at the Big A"),
+    ("Delta Downs MSW 25000", "Delta Downs"),
+])
+def test_brisnet_track_name(rest, name):
+    from totebot.brisnet import _track_name
+
+    assert _track_name(rest) == name
+
+
+def test_run_now_early_is_preview_then_auto_pull(tmp_path):
+    s = settings(tmp_path)
+    store = RaceStore(tmp_path)
+    race = sample_race(post_in_min=30)
+    store.save(race)
+    src = FakeSource()
+    sched = RaceScheduler(s, store, src)
+    run(sched.run_now(race))
+    assert race.status == "preview" and race.tickets
+    run(sched.tick(race.post_time - timedelta(minutes=2.9)))
+    assert race.status == "ready" and src.calls == 2
+    run(sched.tick(race.post_time - timedelta(minutes=1.9)))
+    assert race.status == "published"
+    late = sample_race(post_in_min=2.5)
+    late.id = "LATE"
+    store.save(late)
+    run(sched.run_now(late))
+    assert late.status == "published"

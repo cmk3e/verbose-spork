@@ -49,7 +49,7 @@
   .race .sub { color: var(--muted); font-size: 13px; }
   .race .mtp { margin-left: auto; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
   .badge { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--chip); color: var(--muted); }
-  .badge.ready { color: var(--warn); } .badge.published { color: var(--good); }
+  .badge.ready, .badge.preview { color: var(--warn); } .badge.published { color: var(--good); }
   .badge.error, .badge.missed { color: var(--bad); }
   .hot { color: var(--warn); } .now { color: var(--bad); }
   pre.ticket { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 12px;
@@ -120,7 +120,9 @@ let soundOn = false, lastStatus = {};
 try { soundOn = localStorage.getItem("totebot.sound") === "1"; } catch (e) {}
 
 async function api(path, opts = {}) {
-  const res = await fetch(path, opts);
+  let res;
+  try { res = await fetch(path, opts); }
+  catch (e) { throw new Error("Couldn't reach Totebot (server restarting or offline). Try again in a moment."); }
   if (!res.ok) {
     let msg = res.status + " " + res.statusText;
     try { const j = await res.json(); msg = j.detail || msg; } catch (e) {}
@@ -184,7 +186,7 @@ function renderDetail() {
   const r = detail;
   if (!r) { el.innerHTML = '<div class="empty">Select a race.</div>'; return; }
   const m = mtpOf(r), t = r.tickets;
-  const showTickets = t && (r.status === "published" || r.status === "ready");
+  const showTickets = t && ["published", "ready", "preview"].includes(r.status);
   let html = `<div class="row" style="align-items:center">
       <div style="flex:2 1 200px"><h2 style="margin:0">${esc(r.track)} Race ${r.race_number}</h2>
       <div class="meta" style="color:var(--muted)">Post ${fmtTime(r.post_time)} · <span class="badge ${esc(r.status)}">${esc(r.status)}</span></div></div>
@@ -192,7 +194,7 @@ function renderDetail() {
   if (r.error) html += `<p class="err">${esc(r.error)}</p>`;
 
   if (showTickets) {
-    html += `<h3>Tickets ${r.status === "ready" ? "(release at " + cfg.publish_mtp + " MTP)" : ""}</h3>
+    html += `<h3>Tickets ${r.status === "ready" ? "(release at " + cfg.publish_mtp + " MTP)" : r.status === "preview" ? "(early preview: fresh odds pulled at " + cfg.fetch_mtp + " MTP)" : ""}</h3>
       <pre class="ticket" id="ticketText">${esc(t.ticket_text)}</pre>
       <div class="row" style="margin-top:8px"><button id="copyBtn">Copy tickets</button></div>
       <p class="meta" style="color:var(--muted);font-size:13px">Total ${money(t.total_cost)} · tote pulled ${fmtTime(t.tote_taken_at)}

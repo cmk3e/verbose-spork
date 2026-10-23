@@ -50,7 +50,7 @@ class RaceScheduler:
             await asyncio.sleep(self.s.tick_seconds)
 
     async def tick(self, now: Optional[datetime] = None) -> None:
-        races = [r for r in self.store.all() if r.status in ("scheduled", "ready")]
+        races = [r for r in self.store.all() if r.status in ("scheduled", "preview", "ready")]
         await asyncio.gather(*(self._process(r, now) for r in races))
 
     async def _process(self, race: Race, now: Optional[datetime]) -> None:
@@ -60,7 +60,7 @@ class RaceScheduler:
         async with lock:
             now = now or utcnow()
             mtp = race.mtp(now)
-            if race.status == "scheduled":
+            if race.status in ("scheduled", "preview"):
                 if mtp <= self.s.missed_after_mtp:
                     race.status = "missed"
                     race.note("Post passed before tote could be pulled", now)
@@ -137,7 +137,9 @@ class RaceScheduler:
         )
 
     async def run_now(self, race: Race, snap: Optional[ToteSnapshot] = None) -> Race:
-        """Pull the tote (or use the given snapshot), compute and publish immediately."""
+        """Pull the tote (or use the given snapshot) and compute now. Inside the fetch window the
+        tickets publish at once; earlier they are a preview and the race still gets its normal
+        pull at FETCH_MTP."""
         async with self._locks[race.id]:
             now = utcnow()
             if snap is None:
@@ -145,5 +147,10 @@ class RaceScheduler:
                 self._apply_post_time(race, snap, now)
             await self._compute(race, snap, now)
             if race.status == "ready":
-                await self._publish(race, now)
+                if race.mtp(now) > self.s.fetch_mtp:
+                    race.status = "preview"
+                    race.note(f"Early preview at {race.mtp(now):.1f} MTP; fresh pull still due at {self.s.fetch_mtp:g} MTP", now)
+                    self.store.save(race)
+                else:
+                    await self._publish(race, now)
             return race
