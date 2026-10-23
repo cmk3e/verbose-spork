@@ -60,15 +60,22 @@ def create_app(settings: Optional[Settings] = None, start_scheduler: bool = True
             raise HTTPException(404, "Race not found")
         return race
 
-    def add_races(races: List[Race], replace: bool) -> List[dict]:
+    def add_races(races: List[Race], replace: bool, skipped: Optional[List[str]] = None) -> List[dict]:
+        """Save races. Existing ones are kept unless replace; with a `skipped` list they are noted
+        there instead of failing the request."""
         out = []
         for race in races:
-            existing = store.get(race.id)
-            if existing and not replace:
-                raise HTTPException(409, f"{race.id} already exists (send replace=true to overwrite)")
+            if store.get(race.id) and not replace:
+                if skipped is None:
+                    raise HTTPException(409, f"{race.id} already exists (send replace=true to overwrite)")
+                skipped.append(f"{race.track} R{race.race_number}: already loaded (tick Replace to overwrite)")
+                continue
             store.save(race)
             out.append(race.to_dict())
         return out
+
+    def upload_result(races: List[Race], replace: bool, skipped: List[str]) -> dict:
+        return {"races": add_races(races, replace, skipped), "skipped": skipped}
 
     @app.get("/", include_in_schema=False, dependencies=[Depends(auth)])
     def index():
@@ -125,14 +132,15 @@ def create_app(settings: Optional[Settings] = None, start_scheduler: bool = True
             if data[:5] == b"%PDF-":
                 pages = await asyncio.to_thread(brisnet.pdf_pages, data)  # big PDFs take a while
                 try:
-                    races = races_from_json(brisnet.parse_pages(pages), settings.timezone)
+                    parsed, skipped = brisnet.load_pages(pages)
+                    races = races_from_json(parsed, settings.timezone)
                 except (CardError, ValueError) as e:
                     upload_dir.mkdir(parents=True, exist_ok=True)
                     (upload_dir / "last-rejected.pdf").write_bytes(data)
                     (upload_dir / "last-rejected.txt").write_text(
                         f"{file.filename}: {e}\n\n" + brisnet.diagnose(pages))
                     raise ValueError(f"{e} (details: open /debug/upload)") from e
-                return add_races(races, replace)
+                return upload_result(races, replace, skipped)
             text = data.decode("utf-8-sig")
             if (file.filename or "").lower().endswith(".json") or text.lstrip().startswith(("{", "[")):
                 payload = json.loads(text)
@@ -145,7 +153,7 @@ def create_app(settings: Optional[Settings] = None, start_scheduler: bool = True
                 races = races_from_csv(text, settings.timezone, track, race_number, post_time, date or None)
         except (json.JSONDecodeError, UnicodeDecodeError, CardError, ValueError) as e:
             raise HTTPException(422, str(e))
-        return add_races(races, replace)
+        return upload_result(races, replace, [])
 
     @app.delete("/api/races/{race_id}", dependencies=[Depends(auth)])
     def delete_race(race_id: str):

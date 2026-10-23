@@ -209,7 +209,7 @@ def test_web_flow(tmp_path):
             r = c.post("/api/races/upload", files={"file": ("card.csv", fh, "text/csv")},
                        data={"track": "AQU", "race_number": "7", "post_time": "4:30 PM", "date": "2026-10-23"})
         assert r.status_code == 200, r.text
-        rid = r.json()[0]["id"]
+        rid = r.json()["races"][0]["id"]
         assert [x["id"] for x in c.get("/api/races").json()] == [rid]
 
         r = c.post(f"/api/races/{rid}/tote", json={"win_odds": TOTE, "run": True})
@@ -432,3 +432,41 @@ def test_rejected_pdf_report(tmp_path, monkeypatch):
         page = c.get("/debug/upload").text
         assert "2 pages; 0 look like Brisnet" in page and "EQUINELINE Race 1" in page
         assert (tmp_path / "uploads" / "last-rejected.pdf").exists()
+
+
+def test_brisnet_partial_pdf_reports_skipped():
+    from totebot.brisnet import load_pages
+
+    cover = "Free Past Performances\nBelmont Park\n Race 2\n 3\nRace 3\n 4\nDelta Downs\n Race 7\n 9\n"
+    equineline = "Purchase the Full Card Program Help\n10/23/26 APPROX. POST: 1:43PM Exacta ($1)"
+    delta_no_post = BRISNET_PAGE.replace("Belmont Park", "Delta Downs").replace("Post Time:", "Post at").format(race=7, post="9:52")
+    races, skipped = load_pages([cover, equineline, BRISNET_PAGE.format(race=3, post="2:16"), delta_no_post])
+    assert [(r["track"], r["race_number"]) for r in races] == [("BEL", 3)]
+    assert skipped == ["Delta Downs R7: no post time found",
+                       "Belmont Park R2: not a Brisnet Ultimate PP (probably Equineline)"]
+
+
+def test_post_time_10_or_11_oclock_picks_the_one_still_ahead():
+    from datetime import datetime, timezone
+    from zoneinfo import ZoneInfo
+    from totebot.brisnet import _post_times
+
+    day = datetime(2026, 10, 23, tzinfo=ZoneInfo("America/New_York"))
+    morning = datetime(2026, 10, 23, 13, 0, tzinfo=timezone.utc)   # 9 AM ET
+    evening = datetime(2026, 10, 23, 18, 0, tzinfo=timezone.utc)   # 2 PM ET
+    assert _post_times({7: (10, 15)}, day, morning)[7].hour == 10
+    assert _post_times({7: (10, 15)}, day, evening)[7].hour == 22
+    assert _post_times({1: (11, 30), 2: (12, 1), 9: (10, 5)}, day, morning)[9].hour == 22
+
+
+def test_upload_skips_existing_races(tmp_path, monkeypatch):
+    from totebot import brisnet
+
+    monkeypatch.setattr(brisnet, "pdf_pages", lambda data: [BRISNET_PAGE.format(race=3, post="11:16"), BRISNET_PAGE.format(race=4, post="11:49")])
+    app = create_app(settings(tmp_path, password="pw"), start_scheduler=False)
+    with TestClient(app) as c:
+        c.auth = ("admin", "pw")
+        first = c.post("/api/races/upload", files={"file": ("a.pdf", b"%PDF-1.4", "application/pdf")}).json()
+        assert len(first["races"]) == 2 and first["skipped"] == []
+        again = c.post("/api/races/upload", files={"file": ("a.pdf", b"%PDF-1.4", "application/pdf")}).json()
+        assert again["races"] == [] and len(again["skipped"]) == 2

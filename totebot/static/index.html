@@ -298,8 +298,10 @@ $("#uploadForm").onsubmit = async (ev) => {
   for (const k of ["track", "race_number", "post_time", "date"]) if (!fd.get(k)) fd.delete(k);
   if (!fd.get("replace")) fd.delete("replace");
   try {
-    const added = await api("/api/races/upload", { method: "POST", body: fd });
-    toast(`Added ${added.length} race${added.length === 1 ? "" : "s"}`);
+    const res = await api("/api/races/upload", { method: "POST", body: fd });
+    const added = res.races, skipped = res.skipped || [];
+    toast(`Added ${added.length} race${added.length === 1 ? "" : "s"}` + (skipped.length ? `, skipped ${skipped.length}` : ""));
+    if (skipped.length) alert(`Added ${added.length} races.\n\nSkipped:\n` + skipped.join("\n"));
     ev.target.reset();
     await refresh();
     if (added.length) select(added[0].id);

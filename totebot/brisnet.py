@@ -7,8 +7,8 @@ import csv
 import io
 import re
 import sys
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from datetime import datetime, timedelta, timezone
+from typing import Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
 
 # Brisnet prints post times in Eastern time first: "Post Time: ( 2:16)/ 1:16/12:16/11:16" (ET/CT/MT/PT).
@@ -30,7 +30,8 @@ SMALL_WORDS = {"at", "the", "of", "de", "la", "a", "big"}
 
 HEADER = re.compile(r"Ultimate PP's w/ QuickPlay Comments (?P<rest>.+?)\s+"
                     r"(?P<date>[A-Z][a-z]+ \d{1,2}, \d{4})\s+Race (?P<race>\d+)\s*$", re.M)
-POST = re.compile(r"Post Time:\s*\(\s*(\d{1,2}):(\d{2})\)")
+POST = re.compile(r"Post\s*Time:?\s*\(?\s*(\d{1,2})\s*:\s*(\d{2})")
+TOC_RACE = re.compile(r"^Race (\d+)$")
 HORSE = re.compile(r"^(?P<num>\d{1,2}[A-Z]?) (?P<name>.+?) \((?P<style>E/P|E|P|S|NA)\s*(?P<qsp>\d)?\)\s*Own:", re.M)
 ML = re.compile(r"^\s*(\d{1,3}/\d{1,2})\b", re.M)
 PRIME = re.compile(r"Prime Power:\s*([\d.]+)")
@@ -51,23 +52,47 @@ def _track_name(rest: str) -> str:
     return " ".join(words) or "TRACK"
 
 
-def _post_times(times: Dict[int, tuple], day: datetime) -> Dict[int, datetime]:
-    """Clock times without AM/PM -> datetimes. 10:xx-11:xx are morning; later races never go backwards."""
+def _post_times(times: Dict[int, tuple], day: datetime, now: Optional[datetime] = None) -> Dict[int, datetime]:
+    """Clock times without AM/PM -> datetimes. 12:xx-9:xx are afternoon/evening. 10:xx-11:xx could be
+    morning or night: take whichever hasn't already passed. Later races never go before earlier ones.
+    (TVG's post time corrects a wrong guess when the race is polled.)"""
+    now = now or datetime.now(timezone.utc)
     out: Dict[int, datetime] = {}
     prev: Optional[datetime] = None
     for race in sorted(times):
         h, m = times[race]
-        hour = h if h in (10, 11) else (h % 12) + 12
-        dt = day.replace(hour=hour % 24, minute=m) + timedelta(days=hour // 24)
+        dt = day.replace(hour=(h % 12) + 12, minute=m)
+        if h in (10, 11):
+            morning = day.replace(hour=h, minute=m)
+            if morning >= now - timedelta(minutes=10) and not (prev and morning < prev):
+                dt = morning
         while prev and dt < prev:
             dt += timedelta(hours=12)
         out[race] = prev = dt
     return out
 
 
-def parse_pages(pages: List[str]) -> List[dict]:
+def table_of_contents(pages: List[str]) -> List[Tuple[str, int]]:
+    """(track name, race number) for each race listed on a 365horses-style cover page."""
+    out: List[Tuple[str, int]] = []
+    track = None
+    for text in pages:
+        if HEADER.search(text) or "APPROX. POST" in text:
+            break  # past the cover pages
+        for line in text.splitlines():
+            line = line.strip()
+            m = TOC_RACE.match(line)
+            if m and track:
+                out.append((track, int(m.group(1))))
+            elif line and not line.isdigit() and not m and len(line) < 40:
+                track = line
+    return out
+
+
+def parse_pages(pages: List[str], skipped: Optional[List[str]] = None) -> List[dict]:
     """Race dicts (track, race_number, post_time ISO, runners) from the text of each PDF page.
-    One PDF may hold several tracks; races are kept apart by track and date."""
+    One PDF may hold several tracks; races are kept apart by track and date. Races that can't be
+    used are listed in `skipped` (when given) instead of failing the whole file."""
     races: Dict[tuple, dict] = {}                     # (track name, date, race number) -> race
     times: Dict[tuple, Dict[int, tuple]] = {}         # (track name, date) -> {race number: (h, m)}
     for text in pages:
@@ -107,12 +132,18 @@ def parse_pages(pages: List[str]) -> List[dict]:
     out = []
     for (name, day, num), race in sorted(races.items(), key=lambda kv: (kv[0][1], kv[0][0], kv[0][2])):
         post = posts.get((name, day), {}).get(num)
-        if post is None:
-            raise BrisnetError(f"No post time found for {name} race {num}")
+        if post is None or not race["runners"]:
+            problem = "no post time found" if post is None else "no runners found"
+            if skipped is None:
+                raise BrisnetError(f"{name} race {num}: {problem}")
+            skipped.append(f"{name} R{num}: {problem}")
+            continue
         seen = set()
         race["runners"] = [r for r in race["runners"] if not (r["program_num"] in seen or seen.add(r["program_num"]))]
         race["post_time"] = post.isoformat()
         out.append(race)
+    if not out:
+        raise BrisnetError("No usable Brisnet races in this PDF: " + "; ".join(skipped or []))
     out.sort(key=lambda r: r["post_time"])
     return out
 
@@ -125,6 +156,19 @@ def pdf_pages(data: bytes) -> List[str]:
 
 def parse_pdf(data: bytes) -> List[dict]:
     return parse_pages(pdf_pages(data))
+
+
+def load_pages(pages: List[str]) -> Tuple[List[dict], List[str]]:
+    """(usable races, notes on races left out). Races on the cover page that aren't Brisnet
+    Ultimate PPs (e.g. Equineline PPs) are reported as skipped."""
+    skipped: List[str] = []
+    races = parse_pages(pages, skipped)
+    found = {(r["track_name"].lower(), r["race_number"]) for r in races}
+    noted = {s.split(":")[0].lower() for s in skipped}
+    for track, num in table_of_contents(pages):
+        if (track.lower(), num) not in found and f"{track} r{num}".lower() not in noted:
+            skipped.append(f"{track} R{num}: not a Brisnet Ultimate PP (probably Equineline)")
+    return races, skipped
 
 
 def diagnose(pages: List[str]) -> str:
