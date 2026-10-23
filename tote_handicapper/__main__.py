@@ -47,7 +47,12 @@ def cmd_run(args) -> None:
     provider = build_provider(cfg.get("provider", {"type": "demo"}))
     scheduler = Scheduler(provider, cfg)
     web_cfg = cfg.get("web", {})
-    server = serve(scheduler, args.host or web_cfg.get("host", "127.0.0.1"), args.port or web_cfg.get("port", 8000))
+    host = args.host or web_cfg.get("host", "127.0.0.1")
+    password = web_cfg.get("password") or os.environ.get("TOTE_DASHBOARD_PASSWORD")
+    if host not in ("127.0.0.1", "localhost") and not password:
+        logging.getLogger("tote_handicapper").warning(
+            "dashboard is reachable from the network without a password; set TOTE_DASHBOARD_PASSWORD")
+    server = serve(scheduler, host, args.port or web_cfg.get("port", 8000), password)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     try:
         scheduler.run_forever()

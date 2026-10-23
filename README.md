@@ -38,6 +38,29 @@ python -m tote_handicapper train examples/history.json --out model.json
 python -m unittest discover -s tests
 ```
 
+## Run it on a server (AWS / any Ubuntu VM)
+
+Paste this into the VM's terminal (on AWS, open **EC2 → Instances → Connect → EC2 Instance Connect**, which works from an iPad browser):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/cmk3e/verbose-spork/claude/horse-race-tote-handicapper-3lvvip/deploy/install_ubuntu.sh | bash
+```
+
+What the installer does:
+- asks you to choose a dashboard password
+- installs the tool as a service that restarts after crashes and reboots
+- prints the dashboard URL, which is `http://<public-ip>:8000`
+
+To log in to the dashboard, use the username `tote` and your password.
+
+To make the dashboard reachable, open port 8000 in the instance's security group. The safest choice is to allow only **My IP**.
+
+- **Update:** run the same command again. It keeps your password and `config.json`.
+- **Logs:** `journalctl -u tote-handicapper -f`
+- **Config:** edit `~/verbose-spork/config.json`, then run `sudo systemctl restart tote-handicapper`.
+
+The password is sent over plain HTTP, so don't reuse an important one.
+
 ## How the engine is used
 
 `tote_handicapper/handicap.py` connects your engine's classes in this order:
