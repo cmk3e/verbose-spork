@@ -3,6 +3,7 @@ import importlib
 import json
 import logging
 import math
+import statistics
 from functools import lru_cache
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -46,8 +47,14 @@ def fundamental_probabilities(engine, runners: Sequence[Runner], settings: Setti
     if settings.training_file and all(r.features for r in runners):
         model = load_logit_model(settings.engine_module, settings.training_file)
         return model.predict_proba([r.features for r in runners]), "logit_model"
-    if all(r.rating is not None for r in runners):
-        return engine.softmax([r.rating / settings.rating_scale for r in runners]), "rating"
+    rated = [r.rating for r in runners if r.rating is not None]
+    if rated and 2 * len(rated) >= len(runners):
+        # A few unrated runners (e.g. first-time starters) get the field's median rating.
+        fill = statistics.median(rated)
+        missing = [r.program_num for r in runners if r.rating is None]
+        ratings = [fill if r.rating is None else r.rating for r in runners]
+        source = "rating" + (f" (median {fill:g} used for #{', #'.join(missing)})" if missing else "")
+        return engine.softmax([x / settings.rating_scale for x in ratings]), source
     if all(r.ml_odds for r in runners):
         return engine.normalize([1.0 / parse_odds(r.ml_odds) for r in runners]), "morning_line"
     raise HandicapError(

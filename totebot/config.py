@@ -37,7 +37,7 @@ class Settings:
     # Probability model
     alpha: float = 0.6
     beta: float = 0.4
-    rating_scale: float = 5.0
+    rating_scale: float = 8.0
     training_file: str = ""
 
     # Bankroll
@@ -94,7 +94,7 @@ class Settings:
             tick_seconds=_float("TICK_SECONDS", 5.0),
             alpha=_float("BLEND_ALPHA", 0.6),
             beta=_float("BLEND_BETA", 0.4),
-            rating_scale=_float("RATING_SCALE", 5.0),
+            rating_scale=_float("RATING_SCALE", 8.0),
             training_file=_env("TRAINING_FILE"),
             bankroll=_float("BANKROLL", 1000.0),
             fractional_kelly=_float("FRACTIONAL_KELLY", 0.25),

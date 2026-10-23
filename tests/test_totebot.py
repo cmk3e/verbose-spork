@@ -243,3 +243,40 @@ def test_discovery_page(tmp_path):
         assert "runners &lt;odds&gt;" in page and "/discovery/files/1-home.png" in page
         assert c.get("/discovery/files/1-home.png").status_code == 200
         assert c.get("/discovery/files/..%2Fraces").status_code == 404
+
+
+BRISNET_PAGE = """Ultimate PP's w/ QuickPlay Comments Belmont Park ™OC  80000n2x 6 Furlongs (t) 3&up, F & M Friday,  October 23, 2026 Race {race}
+Post Time: ( {post})/ 1:16/12:16/11:16
+1 Xmas in Cairo (E/P 4)Own: Dunham Bernard G
+20/1 Hot Pink, Two Black Hoops, Hot Pink Cap
+Prime Power: 120.3 (3rd) Life: 12 3 - 2 - 3 $111,850 84
+2 Good Vintage (NA 0)Own: Egl-one Racing
+10/1 Purple, Gold Circle
+Life: 0 0 - 0 - 0 $0
+3 Queen Martina (S 0)Own: Kincaid Brad E
+2/1 White, Blue Hoops
+Prime Power: 142.0 (1st) Life: 7 2 - 4 - 1 $97,450 85
+"""
+
+
+def test_brisnet_parse_pages():
+    from totebot.brisnet import parse_pages, to_csv
+
+    races = parse_pages([BRISNET_PAGE.format(race=3, post="2:16"), BRISNET_PAGE.format(race=4, post="11:49")])
+    assert [r["race_number"] for r in races] == [3, 4]
+    r3 = races[0]
+    assert r3["track"] == "BEL" and r3["post_time"] == "2026-10-23T14:16:00-04:00"
+    assert races[1]["post_time"] == "2026-10-23T23:49:00-04:00"  # never earlier than the race before it
+    assert [(x["program_num"], x["style"], x["qsp"], x["ml_odds"], x["rating"]) for x in r3["runners"]] == [
+        ("1", "E/P", 4, "20-1", 120.3), ("2", "P", 0, "10-1", ""), ("3", "S", 0, "2-1", 142.0)]
+    loaded = races_from_csv(to_csv(races), TZ)
+    assert loaded[0].runners[1].rating is None and loaded[0].runners[2].rating == 142.0
+
+
+def test_rating_imputes_minority_missing(tmp_path):
+    from totebot.brisnet import parse_pages
+
+    race = races_from_json(parse_pages([BRISNET_PAGE.format(race=3, post="2:16")]), TZ)[0]
+    snap = ToteSnapshot(taken_at=utcnow(), win_odds={"1": 15.0, "2": 8.0, "3": 3.0})
+    out = run_handicap(race, snap, settings(tmp_path))
+    assert out["fundamental_source"] == "rating (median 131.15 used for #2)"

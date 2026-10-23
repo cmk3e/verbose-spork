@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 
+from . import brisnet
 from .cards import CardError, parse_post_time, races_from_csv, races_from_json
 from .config import Settings, get_settings
 from .models import Race, ToteSnapshot, _parse_dt, utcnow
@@ -105,7 +106,7 @@ def create_app(settings: Optional[Settings] = None, start_scheduler: bool = True
         try:
             payload = await request.json()
             races = races_from_json(payload, settings.timezone, date)
-        except (json.JSONDecodeError, CardError, ValueError) as e:
+        except (json.JSONDecodeError, UnicodeDecodeError, CardError, ValueError) as e:
             raise HTTPException(422, str(e))
         return add_races(races, replace)
 
@@ -118,8 +119,12 @@ def create_app(settings: Optional[Settings] = None, start_scheduler: bool = True
         date: str = Form(""),
         replace: bool = Form(False),
     ):
-        text = (await file.read()).decode("utf-8-sig")
+        data = await file.read()
         try:
+            if data[:5] == b"%PDF-":
+                races = races_from_json(brisnet.parse_pdf(data), settings.timezone)
+                return add_races(races, replace)
+            text = data.decode("utf-8-sig")
             if (file.filename or "").lower().endswith(".json") or text.lstrip().startswith(("{", "[")):
                 payload = json.loads(text)
                 if isinstance(payload, dict) and "races" not in payload:
@@ -129,7 +134,7 @@ def create_app(settings: Optional[Settings] = None, start_scheduler: bool = True
                 races = races_from_json(payload, settings.timezone, date or None)
             else:
                 races = races_from_csv(text, settings.timezone, track, race_number, post_time, date or None)
-        except (json.JSONDecodeError, CardError, ValueError) as e:
+        except (json.JSONDecodeError, UnicodeDecodeError, CardError, ValueError) as e:
             raise HTTPException(422, str(e))
         return add_races(races, replace)
 

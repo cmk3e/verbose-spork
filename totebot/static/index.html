@@ -89,8 +89,8 @@
     <div class="panel" style="margin-top:16px">
       <h2>Add races</h2>
       <form id="uploadForm">
-        <label>Card file (CSV or JSON)</label>
-        <input type="file" name="file" accept=".csv,.json,text/csv,application/json" required>
+        <label>Card file (Brisnet PP PDF, CSV or JSON)</label>
+        <input type="file" name="file" accept=".pdf,.csv,.json,application/pdf,text/csv,application/json" required>
         <div class="row">
           <div><label>Track</label><input name="track" placeholder="AQU"></div>
           <div><label>Race #</label><input name="race_number" inputmode="numeric" placeholder="5"></div>
@@ -100,7 +100,7 @@
           <div><label>Date</label><input name="date" type="date"></div>
         </div>
         <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="replace" value="true" style="width:auto;min-height:0"> Replace if it already exists</label>
-        <p class="meta" style="color:var(--muted);font-size:13px">Leave track / race / post blank if the CSV has those columns (a whole day in one file).</p>
+        <p class="meta" style="color:var(--muted);font-size:13px">For a Brisnet PDF or a whole-day CSV, leave track / race / post blank.</p>
         <button class="primary" type="submit">Upload</button>
       </form>
     </div>
