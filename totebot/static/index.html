@@ -208,7 +208,7 @@ function renderDetail() {
       <div class="row" style="margin-top:8px"><button id="copyBtn">Copy tickets</button></div>
       <p class="meta" style="color:var(--muted);font-size:13px">Total ${money(t.total_cost)} · tote pulled ${fmtTime(t.tote_taken_at)}
       (${(( new Date(r.post_time) - new Date(t.tote_taken_at)) / 60000).toFixed(1)} MTP) · fundamentals: ${esc(t.fundamental_source)}
-      · overround ${t.overround}${t.pace ? " · pace: " + esc(t.pace.scenario) : ""}</p>`;
+      · overround ${t.overround}${t.pace ? " · pace: " + esc(t.pace.scenario) + (t.pace.figures ? " (figures: " + esc(t.pace.figures) + ")" : "") : ""}</p>`;
     (t.notes || []).forEach(n => html += `<p class="meta" style="color:var(--warn);font-size:13px">${esc(n)}</p>`);
     for (const [type, ex] of Object.entries(t.exotics || {})) {
       html += `<p style="font-size:14px"><b>${esc(type)}</b>: ${ex.combos.length} combos · cost ${money(ex.cost)} · hit ${pct(ex.hit_probability)}
@@ -217,10 +217,11 @@ function renderDetail() {
         <thead><tr><th>Combo</th><th></th><th>Model prob</th><th>Est. $1 payout</th><th>EV / $1</th></tr></thead><tbody>${ex.combos.map(c =>
         `<tr><td>${esc(c.combo.join("-"))}</td><td></td><td>${pct(c.p_model, 2)}</td><td>${money(c["est_payout_per_$1"])}</td><td class="pos">+${pct(c["ev_per_$1"], 0)}</td></tr>`).join("")}</tbody></table></div></details>`;
     }
-    html += `<h3>Field</h3><div class="tablewrap"><table><thead><tr><th>#</th><th>Horse</th><th>Odds</th><th>Public</th><th>Fund</th><th>Pace</th><th>True</th><th>EV</th><th>Stake</th></tr></thead><tbody>`;
+    const ml = Object.fromEntries(r.runners.map(x => [x.program_num, x.ml_odds || ""]));
+    html += `<h3>Field</h3><div class="tablewrap"><table><thead><tr><th>#</th><th>Horse</th><th>Odds</th><th>ML</th><th>Public</th><th>Fund</th><th>%E</th><th>Pace</th><th>True</th><th>EV</th><th>Stake</th></tr></thead><tbody>`;
     t.runners.forEach(x => {
-      html += `<tr><td>${esc(x.program_num)}</td><td>${esc(x.name)}</td><td>${esc(x.odds_display)}</td><td>${pct(x.p_public)}</td>
-        <td>${pct(x.p_fund)}</td><td>${(x.pace_mod >= 0 ? "+" : "") + pct(x.pace_mod, 0)}</td><td><b>${pct(x.p_true)}</b></td>
+      html += `<tr><td>${esc(x.program_num)}</td><td>${esc(x.name)}</td><td>${esc(x.odds_display)}</td><td>${esc(ml[x.program_num])}</td><td>${pct(x.p_public)}</td>
+        <td>${pct(x.p_fund)}</td><td>${x.pct_early != null ? x.pct_early.toFixed(1) : ""}</td><td>${(x.pace_mod >= 0 ? "+" : "") + pct(x.pace_mod, 0)}</td><td><b>${pct(x.p_true)}</b></td>
         <td class="${x.ev > 0 ? "pos" : "neg"}">${(x.ev >= 0 ? "+" : "") + pct(x.ev, 0)}</td><td>${x.recommended_stake >= 1 ? money(Math.floor(x.recommended_stake)) : ""}</td></tr>`;
     });
     html += `</tbody></table></div>

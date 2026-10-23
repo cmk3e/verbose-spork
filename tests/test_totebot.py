@@ -1,4 +1,5 @@
 import asyncio
+import math
 import json
 from datetime import timedelta
 from pathlib import Path
@@ -363,7 +364,8 @@ def test_tvg_resolves_unlisted_track_by_name():
         body = json.loads(request.content)
         if body["operationName"] == "getTracks":
             return httpx.Response(200, json={"data": {"tracks": [{"code": c, "name": n} for c, n in TVG_TRACKS.items()]}})
-        asked.append(body["variables"]["trackAbbr"])
+        if body["operationName"] == "getRaceProgram":
+            asked.append(body["variables"]["trackAbbr"])
         return httpx.Response(200, json=tvg_payload())
 
     src = TvgToteSource()
@@ -616,3 +618,148 @@ def test_performance_pages_and_manual_result(tmp_path):
         csv_text = c.get("/api/performance/history.csv").text
         assert csv_text.startswith("date,race_id,track") and csv_text.count("\n") == 5
         assert c.get("/api/performance").json()["races"] == 1
+
+
+# --- extra data: Brisnet figures, TVG extras, odds history ------------------
+
+BRISNET_BLOCK = """ Test Owner
+5/2 Red, White Cap
+DOE JOHN  (100  15-10-12  15%)
+B. f. 4
+Trnr: Roe Richard (40  8-6-5  20%)
+Prime Power: 130.0 (1st) Life: 10 3 - 2 - 1 $100,000 92
+2026 6 2 - 1 - 1 $70,000 92
+Fst (110) 6 2 - 1 - 0 $60,000 90
+Dis (105) 2 1 - 0 - 0 $20,000 88
+Trf (99) 4 1 - 1 - 1 $40,000 92
+L 124
+ñ Best speed in field × Poor trainer win%
+    DATE  TRK               DIST RR     RACETYPE CR   E1    E2/     LP     1c    2c     SPD  PP  ST 1C
+01Oct26Bel« Ì 6f ft :22 :45 1:09 ¦ ¨¨§ Alw 80000¨¨©90 88/ 80 +2 0 88 1 4 3 4 2 1 SmithJ L 2.00 X Y Z ok 6
+10Sep26Sar¨ à 5f fm :22 :44 :56 ¦ ¨¨« OC100k¨¨ª 93/ 78 80 4 2 4 4 3 7 SmithJ L 3.20 X Y Z weakened 8
+15Aug26Sar¬ Ì 6f ft :22 :45 1:10 ¦ ¨¨§ Alw 80000 ¨¨§ 84 82/ 78 0 0 85 2 3 3 3 3 2 SmithJ L 4.00 X Y Z ins 7
+16Aug24 Newbury(GB) à *5f gd 1:00 ¨¨¬ Hcp 57132 ¨¨® 3 O'neillK 40.00 A B C 13
+×10Oct Bel  4f  ft   :48  B1/9      03Oct Bel  4f  ft   :49  B3/10
+"""
+
+
+def test_brisnet_horse_stats():
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    from totebot.brisnet import horse_stats
+
+    s = horse_stats(BRISNET_BLOCK, datetime(2026, 10, 23, tzinfo=ZoneInfo(TZ)), "Fst")
+    assert s["days_off"] == 22
+    assert (s["last_speed"], s["best_speed_3"], s["races_with_figs"]) == (88, 88, 3)
+    assert s["avg_e1"] == 87.0                       # E1 only from full lines: (90 + 84) / 2
+    assert s["avg_e2"] == pytest.approx(87.67, abs=0.01) and s["avg_lp"] == pytest.approx(78.67, abs=0.01)
+    assert (s["jockey_win_pct"], s["trainer_win_pct"]) == (15, 20)
+    assert (s["life_starts"], s["life_wins"], s["life_best_speed"]) == (10, 3, 92)
+    assert (s["surface_starts"], s["surface_wins"], s["surface_best_speed"], s["surface_pedigree"]) == (6, 2, 90, 110)
+    assert (s["dist_starts"], s["dist_best_speed"]) == (2, 88)
+    assert (s["lasix"], s["weight"]) == (1, 124)
+    assert (s["qp_positive"], s["qp_negative"]) == (1, 1)    # the workout bullet doesn't count
+
+
+def test_brisnet_pages_feed_pace_figures():
+    from totebot.brisnet import parse_pages
+
+    page = BRISNET_PAGE.format(race=3, post="2:16").replace(
+        "Prime Power: 120.3 (3rd)", "PARS: 94  97/ 86   87\nPrime Power: 120.3 (3rd)").replace(
+        "Prime Power: 142.0 (1st) Life: 7 2 - 4 - 1 $97,450 85\n",
+        "Prime Power: 142.0 (1st) Life: 7 2 - 4 - 1 $97,450 85\n" + BRISNET_BLOCK[BRISNET_BLOCK.index("    DATE"):])
+    race = parse_pages([page])[0]
+    martina = race["runners"][2]
+    assert (martina["call1_fps"], martina["call2_fps"]) == (87.0, pytest.approx(87.67, abs=0.01))
+    assert martina["stats"]["prime_power"] == 142.0 and martina["stats"]["turf"] == 1
+    assert martina["stats"]["par_speed"] == 87 and martina["stats"]["speed_vs_par"] == 1
+    assert "call1_fps" not in race["runners"][1]          # first-time starter: no figures
+
+
+def test_tvg_parse_extras():
+    from totebot.sources.tvg import parse_extras
+
+    data = {"data": {"race": {
+        "racePools": [{"wagerType": {"name": "Win"}, "amount": 15234.0}, {"wagerType": {"name": "Exacta"}, "amount": 9000}],
+        "lateChanges": {"raceChanges": [{"description": "Surface Change", "oldValue": "Turf", "newValue": "Dirt"}],
+                        "horseChanges": [{"runnerId": "2", "changes": [{"description": "Jockey", "oldValue": "A", "newValue": "B"}]}]},
+        "bettingInterests": [{"runners": [{"runnerId": "1", "handicapping": {
+            "speedAndClass": {"avgSpeed": 85, "highSpeed": 90}, "averagePace": {"early": 92, "middle": 90, "finish": 80},
+            "snapshot": {"daysOff": 21, "powerRating": None}}}]}],
+    }}}
+    x = parse_extras(data)
+    assert x["pools"] == {"win": 15234.0, "exacta": 9000.0}
+    assert x["surface_change"] == "Surface Change: Turf -> Dirt"
+    assert "#2 Jockey: A -> B" in x["late_changes"]
+    assert x["runners"]["1"] == {"tvg_avg_speed": 85.0, "tvg_high_speed": 90.0, "tvg_pace_early": 92.0,
+                                 "tvg_pace_middle": 90.0, "tvg_pace_finish": 80.0, "tvg_days_off": 21.0}
+    assert parse_extras({}) == {"pools": {}, "late_changes": [], "surface_change": None, "runners": {}}
+
+
+def test_pace_inputs_prefers_card_then_tvg():
+    from totebot.handicap import pace_inputs
+    from totebot.models import Runner
+
+    rs = [Runner("1", call1_fps=90, call2_fps=88, final_fps=80), Runner("2", call1_fps=80, call2_fps=82, final_fps=90),
+          Runner("3")]
+    snap = tote()
+    figs, label = pace_inputs(rs, snap)
+    assert label == "card (median for 1 without figures)" and figs[2] == {"call1_fps": 85.0, "call2_fps": 85.0, "final_fps": 85.0}
+    bare = [Runner("1"), Runner("2"), Runner("3")]
+    snap.extras = {"runners": {n: {"tvg_pace_early": 90, "tvg_pace_middle": 85, "tvg_pace_finish": 80} for n in ("1", "2", "3")}}
+    figs, label = pace_inputs(bare, snap)
+    assert label == "tvg" and figs[0]["final_fps"] == 80
+    assert pace_inputs(bare, tote())[0] is None
+
+
+def test_odds_features_and_history(tmp_path):
+    from totebot.handicap import odds_features
+
+    store = RaceStore(tmp_path)
+    race = sample_race(post_in_min=10)
+    store.save(race)
+    sched = RaceScheduler(settings(tmp_path), store, FakeSource(snap=tote()))
+    run(sched.tick(race.post_time - timedelta(minutes=13)))       # pre-poll
+    assert len(race.odds_history) == 1 and race.odds_history[0]["mtp"] == 13.0
+    snap = tote()
+    snap.taken_at = race.post_time - timedelta(minutes=3)
+    snap.win_odds["4"] = 2.5                                      # #4 bet down from 9-2 (5.5) at the pre-poll
+    f = odds_features(race, snap, "4")
+    assert f["steam_10m"] == pytest.approx(math.log(5.5 / 2.5), abs=1e-4) and f["steam_window_min"] == 10.0
+    assert f["odds_ml"] == 5.0 and f["steam_ml"] == pytest.approx(math.log(5.0 / 2.5), abs=1e-4)   # ML 4-1
+
+
+def test_handicap_pool_cap_surface_change_and_stats(tmp_path):
+    race = sample_race()
+    snap = tote()
+    snap.extras = {"pools": {"win": 300.0}, "surface_change": "Surface: Turf -> Dirt", "late_changes": ["Surface: Turf -> Dirt"],
+                   "runners": {"1": {"tvg_avg_speed": 80.0}}}
+    s = settings(tmp_path, bankroll=100000)
+    out = run_handicap(race, snap, s)
+    assert out["win_bets"] and all(b["stake"] <= 6 for b in out["win_bets"])   # 2% of a $300 pool
+    assert out["ticket_text"].splitlines()[1] == "!! SURFACE CHANGE: Surface: Turf -> Dirt"
+    assert out["notes"][0].startswith("SURFACE CHANGE") and any(n.startswith("Win pool $300") for n in out["notes"])
+    one = next(r for r in out["runners"] if r["program_num"] == "1")
+    assert one["stats"]["tvg_avg_speed"] == 80.0 and "odds_ml" in one["stats"] and one["pct_early"] is not None
+    assert out["pace"]["figures"] == "none"                     # only 3 of 7 on this card have figures
+    assert "No pace figures: %-early used engine defaults" in out["notes"]
+    skip = run_handicap(race, snap, settings(tmp_path, surface_change_action="skip"))
+    assert skip["win_bets"] == [] and skip["exotics"] == {}
+
+
+def test_history_csv_includes_stats(tmp_path):
+    from totebot.performance import settle
+
+    app = create_app(settings(tmp_path, password="pw"), start_scheduler=False)
+    race = sample_race(post_in_min=-20)
+    race.status = "published"
+    race.tickets = run_handicap(race, tote(extras={"pools": {"win": 5000.0}}), settings(tmp_path))
+    race.result = {"finish": ["4", "2", "6", "1"], "final_odds": {}, "payoffs": {}, "scratched": []}
+    race.settlement = settle(race.tickets, race.result)
+    race.result_status = "official"
+    app.state.store.save(race)
+    with TestClient(app) as c:
+        c.auth = ("admin", "pw")
+        header = c.get("/api/performance/history.csv").text.splitlines()[0].split(",")
+        for col in ("pct_early", "win_pool", "odds_ml", "steam_ml", "won"):
+            assert col in header

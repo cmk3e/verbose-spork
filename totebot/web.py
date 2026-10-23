@@ -271,7 +271,8 @@ def create_app(settings: Optional[Settings] = None, start_scheduler: bool = True
         rows = performance.history_rows(store.all(), settings.timezone)
         buf = io.StringIO()
         if rows:
-            w = csv.DictWriter(buf, fieldnames=list(rows[0]))
+            fields = list(dict.fromkeys(k for row in rows for k in row))  # recorded stats vary by race
+            w = csv.DictWriter(buf, fieldnames=fields, restval="")
             w.writeheader()
             w.writerows(rows)
         return PlainTextResponse(buf.getvalue(), media_type="text/csv",

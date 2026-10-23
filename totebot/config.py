@@ -30,7 +30,7 @@ class Settings:
     # Timing (minutes to post)
     fetch_mtp: float = 3.0
     publish_mtp: float = 2.0
-    prepoll_mtp: float = 15.0
+    prepoll_mtp: float = 20.0
     prepoll_interval_s: float = 60.0
     missed_after_mtp: float = -5.0
     tick_seconds: float = 5.0
@@ -47,6 +47,8 @@ class Settings:
     max_race_exposure: float = 0.05
     odds_haircut: float = 0.05
     min_win_bet: float = 2.0
+    max_pool_share: float = 0.02         # cap each win bet at this share of the win pool
+    surface_change_action: str = "flag"  # flag | skip (no bets) when a race comes off the turf
 
     # Exotics
     exacta_base: float = 1.0
@@ -90,7 +92,7 @@ class Settings:
             tvg_wager_profile=_env("TVG_WAGER_PROFILE", "PORT-Generic"),
             fetch_mtp=_float("FETCH_MTP", 3.0),
             publish_mtp=_float("PUBLISH_MTP", 2.0),
-            prepoll_mtp=_float("PREPOLL_MTP", 15.0),
+            prepoll_mtp=_float("PREPOLL_MTP", 20.0),
             prepoll_interval_s=_float("PREPOLL_INTERVAL_S", 60.0),
             missed_after_mtp=_float("MISSED_AFTER_MTP", -5.0),
             tick_seconds=_float("TICK_SECONDS", 5.0),
@@ -103,6 +105,8 @@ class Settings:
             max_race_exposure=_float("MAX_RACE_EXPOSURE", 0.05),
             odds_haircut=_float("ODDS_HAIRCUT", 0.05),
             min_win_bet=_float("MIN_WIN_BET", 2.0),
+            max_pool_share=_float("MAX_POOL_SHARE", 0.02),
+            surface_change_action=_env("SURFACE_CHANGE_ACTION", "flag").lower(),
             exacta_base=_float("EXACTA_BASE", 1.0),
             exacta_budget=_float("EXACTA_BUDGET", 20.0),
             superfecta_base=_float("SUPERFECTA_BASE", 0.10),

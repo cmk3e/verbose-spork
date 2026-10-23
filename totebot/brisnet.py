@@ -1,7 +1,9 @@
 """Read race cards out of Brisnet Ultimate PP PDFs.
 
 Per runner it takes program number, name, Brisnet run style + Quirin points, morning line and
-Prime Power (used as the `rating`). Usage:  python -m totebot.brisnet card.pdf > card.csv
+Prime Power (used as the `rating`), plus E1/E2/LP pace figures from recent races (fed to the
+engine's %-early pace calculation) and a set of recorded `stats` for later model fitting.
+Usage:  python -m totebot.brisnet card.pdf > card.csv
 """
 import csv
 import io
@@ -35,6 +37,20 @@ TOC_RACE = re.compile(r"^Race (\d+)$")
 HORSE = re.compile(r"^(?P<num>\d{1,2}[A-Z]?) (?P<name>.+?) \((?P<style>E/P|E|P|S|NA)\s*(?P<qsp>\d)?\)\s*Own:", re.M)
 ML = re.compile(r"^\s*(\d{1,3}/\d{1,2})\b", re.M)
 PRIME = re.compile(r"Prime Power:\s*([\d.]+)")
+PARS = re.compile(r"PARS:\s*(\d+)\s+(\d+)/\s*(\d+)\s+(\d+)")
+PP_DATE = re.compile(r"^(\d{2})([A-Z][a-z]{2})(\d{2})")
+# Past-performance figures: "E1 E2/ LP 1c 2c SPD PP " (E1 may be glued to the class-rating glyphs)...
+FULL_FIGS = re.compile(r"(?<!\d)(\d{2,3}) (\d{2,3})/ (\d{2,3}) ([+-]?\d{1,2}) ([+-]?\d{1,2}) (\d{1,3}) (\d{1,2}) ")
+# ...or, for short sprints, just "E2/ LP SPD PP ST ".
+SHORT_FIGS = re.compile(r"(?<!\d)(\d{2,3})/ (\d{2,3}) (\d{1,3}) (\d{1,2}) (\d{1,2}) ")
+JOCKEY = re.compile(r"^[A-Z][A-Z.,' -]+?\s+\(\s*(\d+)\s+(\d+)-(\d+)-(\d+)\s+(\d+)%\)", re.M)
+TRAINER = re.compile(r"Trnr:.*?\(\s*(\d+)\s+(\d+)-(\d+)-(\d+)\s+(\d+)%\)")
+LIFE = re.compile(r"Life:\s*(\d+)\s+(\d+)\s*-\s*(\d+)\s*-\s*(\d+)\s+\$[\d,]+(?:[ \t]+(\d+))?")
+RECORD = re.compile(r"^(Fst|Off|Dis|Trf|AW)\s*(?:\((\d+)\*?\)|\(\w+\))?\s+(\d+)\s+(\d+)\s*-\s*(\d+)\s*-\s*(\d+)"
+                    r"\s+\$[\d,]+(?:[ \t]+(\d+))?", re.M)
+WEIGHT = re.compile(r"^(L\s+)?(\d{3})\s*$", re.M)
+MONTHS = {m: i for i, m in enumerate(["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jly", "Aug", "Sep", "Oct", "Nov", "Dec"], 1)}
+RECENT_RACES = 3
 
 
 class BrisnetError(ValueError):
@@ -72,6 +88,73 @@ def _post_times(times: Dict[int, tuple], day: datetime, now: Optional[datetime] 
     return out
 
 
+def _avg(xs: List[float]) -> Optional[float]:
+    return round(sum(xs) / len(xs), 2) if xs else None
+
+
+def horse_stats(block: str, race_day: datetime, surface: str) -> Dict[str, float]:
+    """Numbers from one horse's PP block. Pace averages (avg_e1/avg_e2/avg_lp) and speed figures
+    come from the most recent races that show figures."""
+    stats: Dict[str, float] = {}
+    head, _, pps = block.partition("DATE  TRK")
+    figs = []
+    last_date = None
+    for line in pps.splitlines():
+        line = line.strip()
+        m = PP_DATE.match(line)
+        if not m or m.group(2) not in MONTHS:
+            continue
+        if last_date is None:
+            last_date = datetime(2000 + int(m.group(3)), MONTHS[m.group(2)], int(m.group(1)), tzinfo=race_day.tzinfo)
+        full = FULL_FIGS.search(line)
+        short = None if full else SHORT_FIGS.search(line)
+        if full:
+            e1, e2, lp, spd = int(full.group(1)), int(full.group(2)), int(full.group(3)), int(full.group(6))
+        elif short:
+            e1, e2, lp, spd = None, int(short.group(1)), int(short.group(2)), int(short.group(3))
+        else:
+            continue
+        if 0 < spd <= 130:
+            figs.append((e1, e2, lp, spd))
+    if last_date:
+        stats["days_off"] = (race_day.date() - last_date.date()).days
+    recent = figs[:RECENT_RACES]
+    if recent:
+        speeds = [f[3] for f in recent]
+        stats.update(last_speed=speeds[0], best_speed_3=max(speeds), avg_speed_3=_avg(speeds), races_with_figs=len(figs))
+        e1s = [f[0] for f in recent if f[0] is not None]
+        if e1s:
+            stats["avg_e1"] = _avg(e1s)
+        stats["avg_e2"] = _avg([f[1] for f in recent])
+        stats["avg_lp"] = _avg([f[2] for f in recent])
+
+    if (j := JOCKEY.search(block)):
+        stats["jockey_starts"], stats["jockey_win_pct"] = int(j.group(1)), int(j.group(5))
+    if (t := TRAINER.search(block)):
+        stats["trainer_starts"], stats["trainer_win_pct"] = int(t.group(1)), int(t.group(5))
+    if (life := LIFE.search(block)):
+        starts, wins = int(life.group(1)), int(life.group(2))
+        stats.update(life_starts=starts, life_wins=wins, life_win_pct=round(wins / starts, 3) if starts else 0.0)
+        if life.group(5):
+            stats["life_best_speed"] = int(life.group(5))
+    for rec in RECORD.finditer(block):
+        kind = rec.group(1)
+        if kind not in (surface, "Dis"):
+            continue
+        prefix = "dist" if kind == "Dis" else "surface"
+        stats[f"{prefix}_starts"], stats[f"{prefix}_wins"] = int(rec.group(3)), int(rec.group(4))
+        if rec.group(7):
+            stats[f"{prefix}_best_speed"] = int(rec.group(7))
+        if rec.group(2):
+            stats[f"{prefix}_pedigree"] = int(rec.group(2))
+    if (w := WEIGHT.search(block)):
+        stats["lasix"], stats["weight"] = int(bool(w.group(1))), int(w.group(2))
+    quick = [ln.strip() for ln in head.splitlines() if ln.strip()[:1] in ("ñ", "×")]
+    stats["qp_positive"] = sum(ln.count("ñ") for ln in quick)
+    stats["qp_negative"] = sum(ln.count("×") for ln in quick)
+    return stats
+
+
 def table_of_contents(pages: List[str]) -> List[Tuple[str, int]]:
     """(track name, race number) for each race listed on a 365horses-style cover page."""
     out: List[Tuple[str, int]] = []
@@ -103,10 +186,14 @@ def parse_pages(pages: List[str], skipped: Optional[List[str]] = None) -> List[d
         name = _track_name(header.group("rest"))
         day = datetime.strptime(header.group("date"), "%B %d, %Y").replace(tzinfo=ZoneInfo(BRISNET_TZ))
         card = (name, day)
+        rest = header.group("rest")
+        surface = "Trf" if re.search(r"\((?:t|T)\)", rest) else "AW" if re.search(r"\(A\)", rest) else "Fst"
         race = races.setdefault((name, day, num), {
             "track": TRACK_CODES.get(name.lower(), name), "track_name": name,
-            "race_number": num, "runners": [],
+            "race_number": num, "runners": [], "pars": {}, "surface": surface,
         })
+        if (pars := PARS.search(text)):
+            race["pars"] = dict(zip(("par_e1", "par_e2", "par_lp", "par_speed"), map(int, pars.groups())))
         post = POST.search(text)
         if post:
             times.setdefault(card, {})[num] = (int(post.group(1)), int(post.group(2)))
@@ -116,6 +203,14 @@ def parse_pages(pages: List[str], skipped: Optional[List[str]] = None) -> List[d
             ml = ML.search("\n".join(block.splitlines()[:3]))
             prime = PRIME.search(block)
             style = h.group("style")
+            stats = horse_stats(block, day, race["surface"])
+            pace = {}
+            if "avg_e2" in stats:
+                # Brisnet pace figures stand in for the engine's call fps: it only uses their ratio.
+                pace = {"call1_fps": stats.get("avg_e1", stats["avg_e2"]), "call2_fps": stats["avg_e2"],
+                        "final_fps": stats["avg_lp"]}
+            if prime:
+                stats["prime_power"] = float(prime.group(1))
             race["runners"].append({
                 "program_num": h.group("num"),
                 "name": h.group("name").strip(),
@@ -125,6 +220,8 @@ def parse_pages(pages: List[str], skipped: Optional[List[str]] = None) -> List[d
                 "qsp": int(h.group("qsp") or 0),
                 "ml_odds": ml.group(1).replace("/", "-") if ml else "",
                 "rating": float(prime.group(1)) if prime else "",
+                **pace,
+                "stats": stats,
             })
     if not races:
         raise BrisnetError("No Brisnet Ultimate PP races found in this PDF")
@@ -141,6 +238,10 @@ def parse_pages(pages: List[str], skipped: Optional[List[str]] = None) -> List[d
         seen = set()
         race["runners"] = [r for r in race["runners"] if not (r["program_num"] in seen or seen.add(r["program_num"]))]
         race["post_time"] = post.isoformat()
+        for r in race["runners"]:
+            r["stats"].update(race["pars"], turf=int(race["surface"] == "Trf"))
+            if "best_speed_3" in r["stats"] and "par_speed" in race["pars"]:
+                r["stats"]["speed_vs_par"] = r["stats"]["best_speed_3"] - race["pars"]["par_speed"]
         out.append(race)
     if not out:
         raise BrisnetError("No usable Brisnet races in this PDF: " + "; ".join(skipped or []))
@@ -186,7 +287,7 @@ def diagnose(pages: List[str]) -> str:
 
 
 CSV_COLUMNS = ["track", "race_number", "post_time", "program_num", "name", "style", "qsp",
-               "rating", "ml_odds", "brisnet_style"]
+               "rating", "ml_odds", "call1_fps", "call2_fps", "final_fps", "brisnet_style"]
 
 
 def to_csv(races: List[dict]) -> str:

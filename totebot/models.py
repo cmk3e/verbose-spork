@@ -44,6 +44,7 @@ class Runner:
     features: Optional[List[float]] = None  # alternative: features for the ConditionalLogitModel
     ml_odds: Optional[str] = None        # morning line, e.g. "5-2"
     scratched: bool = False
+    stats: Optional[Dict[str, float]] = None  # extra handicapping numbers (recorded for model fitting)
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "Runner":
@@ -63,6 +64,8 @@ class Runner:
             data["ml_odds"] = str(data["ml_odds"])
         if "scratched" in data:
             data["scratched"] = str(data["scratched"]).strip().lower() in ("1", "true", "yes", "y", "scr")
+        if "stats" in data and not isinstance(data["stats"], dict):
+            del data["stats"]
         return cls(**data)
 
 
@@ -74,6 +77,9 @@ class ToteSnapshot:
     post_time: Optional[datetime] = None       # source's current post time, if it reports one
     exacta_probables: Dict[str, float] = field(default_factory=dict)  # "1-2" -> payout per $1
     source: str = ""
+    # Optional extras from the source: {"runners": {num: {stat: value}}, "pools": {"win": amount},
+    #   "late_changes": [text], "surface_change": text or None}
+    extras: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -90,6 +96,7 @@ class ToteSnapshot:
             post_time=_parse_dt(d.get("post_time")),
             exacta_probables={str(k): float(v) for k, v in d.get("exacta_probables", {}).items()},
             source=d.get("source", ""),
+            extras=d.get("extras") or {},
         )
 
 
@@ -122,6 +129,7 @@ class Race:
     settlement: Optional[Dict[str, Any]] = None
     result_status: Optional[str] = None      # None | "pending" | "official" | "unavailable"
     last_result_check: Optional[datetime] = None
+    odds_history: List[Dict[str, Any]] = field(default_factory=list)  # [{"t", "mtp", "odds": {num: decimal}}]
     log: List[str] = field(default_factory=list)
 
     def mtp(self, now: Optional[datetime] = None) -> float:
@@ -151,6 +159,7 @@ class Race:
             "settlement": self.settlement,
             "result_status": self.result_status,
             "last_result_check": _iso(self.last_result_check),
+            "odds_history": self.odds_history,
             "log": self.log,
         }
 
@@ -173,5 +182,6 @@ class Race:
             settlement=d.get("settlement"),
             result_status=d.get("result_status"),
             last_result_check=_parse_dt(d.get("last_result_check")),
+            odds_history=list(d.get("odds_history") or []),
             log=list(d.get("log", [])),
         )

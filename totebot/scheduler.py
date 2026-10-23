@@ -18,6 +18,7 @@ POST_TIME_TOLERANCE_S = 30
 RESULT_FIRST_CHECK_MIN = 3      # start looking for the official result this long after post
 RESULT_CHECK_INTERVAL_S = 120
 RESULT_GIVE_UP_MIN = 180
+ODDS_HISTORY_MAX = 60
 
 
 class RaceScheduler:
@@ -116,6 +117,12 @@ class RaceScheduler:
     def _prepoll_due(self, race: Race, now: datetime) -> bool:
         return race.last_prepoll is None or (now - race.last_prepoll).total_seconds() >= self.s.prepoll_interval_s
 
+    def _observe(self, race: Race, snap: ToteSnapshot, now: datetime) -> None:
+        """Every odds poll: follow post-time changes and keep the odds for the race's history."""
+        self._apply_post_time(race, snap, now)
+        race.odds_history.append({"t": now.isoformat(), "mtp": round(race.mtp(now), 2), "odds": dict(snap.win_odds)})
+        del race.odds_history[:-ODDS_HISTORY_MAX]
+
     def _apply_post_time(self, race: Race, snap: ToteSnapshot, now: datetime) -> None:
         if snap.post_time and abs((snap.post_time - race.post_time).total_seconds()) > POST_TIME_TOLERANCE_S:
             race.note(f"Post time moved {race.post_time:%H:%M}Z -> {snap.post_time:%H:%M}Z", now)
@@ -125,7 +132,7 @@ class RaceScheduler:
         race.last_prepoll = now
         try:
             snap = await self.source.fetch(race)
-            self._apply_post_time(race, snap, now)
+            self._observe(race, snap, now)
         except ToteUnavailable as e:
             race.note(f"Pre-poll: {e}", now)
         except Exception as e:
@@ -146,7 +153,7 @@ class RaceScheduler:
             self.store.save(race)
             return
 
-        self._apply_post_time(race, snap, now)
+        self._observe(race, snap, now)
         if race.mtp(now) > self.s.fetch_mtp + 0.25:
             self.store.save(race)  # post got pushed back; wait for the new window
             return
@@ -185,7 +192,7 @@ class RaceScheduler:
             now = utcnow()
             if snap is None:
                 snap = await self.source.fetch(race)
-                self._apply_post_time(race, snap, now)
+                self._observe(race, snap, now)
             await self._compute(race, snap, now)
             if race.status == "ready":
                 if race.mtp(now) > self.s.fetch_mtp:

@@ -100,6 +100,80 @@ query getRaceResult($trackAbbr: String, $raceNumber: String, $wagerProfile: Stri
   }
 }
 """
+EXTRAS_QUERY = """
+query getRaceExtras($trackAbbr: String, $raceNumber: String, $wagerProfile: String) {
+  race(track: $trackAbbr, number: $raceNumber, profile: $wagerProfile) {
+    racePools { wagerType { id name } amount }
+    lateChanges {
+      raceChanges { description newValue oldValue }
+      horseChanges { runnerId changes { description newValue oldValue } }
+    }
+    bettingInterests {
+      runners {
+        runnerId
+        handicapping {
+          speedAndClass { avgClassRating highSpeed avgSpeed lastClassRating avgDistance }
+          averagePace { early middle finish numRaces }
+          jockeyTrainer { starts wins places shows }
+          snapshot { powerRating daysOff horseWins horseStarts }
+        }
+      }
+    }
+  }
+}
+"""
+EXTRAS_TTL_S = 120
+HANDICAPPING_FIELDS = {
+    ("speedAndClass", "avgClassRating"): "tvg_avg_class", ("speedAndClass", "lastClassRating"): "tvg_last_class",
+    ("speedAndClass", "highSpeed"): "tvg_high_speed", ("speedAndClass", "avgSpeed"): "tvg_avg_speed",
+    ("speedAndClass", "avgDistance"): "tvg_avg_distance",
+    ("averagePace", "early"): "tvg_pace_early", ("averagePace", "middle"): "tvg_pace_middle",
+    ("averagePace", "finish"): "tvg_pace_finish", ("averagePace", "numRaces"): "tvg_pace_races",
+    ("jockeyTrainer", "starts"): "tvg_jt_starts", ("jockeyTrainer", "wins"): "tvg_jt_wins",
+    ("snapshot", "powerRating"): "tvg_power_rating", ("snapshot", "daysOff"): "tvg_days_off",
+    ("snapshot", "horseWins"): "tvg_wins", ("snapshot", "horseStarts"): "tvg_starts",
+}
+
+
+def _number(v: Any) -> Optional[float]:
+    try:
+        return float(v) if v not in (None, "") else None
+    except (TypeError, ValueError):
+        return None
+
+
+def parse_extras(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Pools, late changes and TVG's per-runner handicapping numbers (whatever is present)."""
+    race = (data.get("data") or {}).get("race") or {}
+    pools = {}
+    for p in race.get("racePools") or []:
+        name = ((p.get("wagerType") or {}).get("name") or "").lower()
+        if name and _number(p.get("amount")) is not None:
+            pools[name] = _number(p["amount"])
+    changes, surface_change = [], None
+    late = race.get("lateChanges") or {}
+    for c in late.get("raceChanges") or []:
+        text = f"{c.get('description')}: {c.get('oldValue') or '?'} -> {c.get('newValue') or '?'}"
+        changes.append(text)
+        if re.search(r"surface|course", str(c.get("description")), re.I):
+            surface_change = text
+    for h in late.get("horseChanges") or []:
+        for c in h.get("changes") or []:
+            changes.append(f"#{h.get('runnerId')} {c.get('description')}: {c.get('oldValue') or '?'} -> {c.get('newValue') or '?'}")
+    runners: Dict[str, Dict[str, float]] = {}
+    for bi in race.get("bettingInterests") or []:
+        for r in bi.get("runners") or []:
+            hcp = r.get("handicapping") or {}
+            stats = {}
+            for (group, key), name in HANDICAPPING_FIELDS.items():
+                value = _number((hcp.get(group) or {}).get(key))
+                if value is not None:
+                    stats[name] = value
+            if stats and r.get("runnerId"):
+                runners[str(r["runnerId"]).strip()] = stats
+    return {"pools": pools, "late_changes": changes, "surface_change": surface_change, "runners": runners}
+
+
 OFFICIAL_STATUS = "RO"  # TVG: result official
 BET_TYPE_NAMES = {"win": "win", "exacta": "exacta", "trifecta": "trifecta", "superfecta": "superfecta"}
 
@@ -217,6 +291,7 @@ class TvgToteSource(ToteSource):
         self._tracks: Dict[str, str] = {}
         self._tracks_at = 0.0
         self._resolved: Dict[str, str] = {}
+        self._extras: Dict[str, tuple] = {}  # race id -> (monotonic time, extras)
 
     async def tracks(self) -> Dict[str, str]:
         """Today's TVG tracks as {code: name}, cached for half an hour."""
@@ -265,7 +340,22 @@ class TvgToteSource(ToteSource):
 
     async def fetch(self, race: Race) -> ToteSnapshot:
         track = await self.resolve_track(race)
-        return parse_race(await self.fetch_raw(track, race.race_number))
+        snap = parse_race(await self.fetch_raw(track, race.race_number))
+        snap.extras = await self.extras(race, track)
+        return snap
+
+    async def extras(self, race: Race, track: str) -> Dict[str, Any]:
+        """Best effort: the odds never wait on or fail because of these. Cached briefly per race."""
+        cached = self._extras.get(race.id)
+        if cached and time.monotonic() - cached[0] < EXTRAS_TTL_S:
+            return cached[1]
+        try:
+            extras = parse_extras(await self._post("getRaceExtras", EXTRAS_QUERY, {
+                "trackAbbr": track, "raceNumber": str(race.race_number), "wagerProfile": self.wager_profile}))
+        except Exception:
+            extras = cached[1] if cached else {}
+        self._extras[race.id] = (time.monotonic(), extras)
+        return extras
 
     async def fetch_result_raw(self, track: str, race_number: int) -> Dict[str, Any]:
         return await self._post("getRaceResult", RESULT_QUERY, {

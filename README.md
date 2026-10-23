@@ -106,6 +106,20 @@ A few minutes after each published race goes official, Totebot pulls the result,
 
 **Download history (CSV)** gives one row per horse per race (probabilities, odds at pull and final, finish), for fitting the engine further. If a source can't report results, record one with `POST /api/races/{id}/result` (`{"finish": ["4","6","8","1"], "payoffs": {"exacta": {"4-6": 9.2}}}`, payoffs per $1). Check TVG's result for a race from `/opt/totebot` with `.venv/bin/python -m totebot.sources.tvg result BEL 3`.
 
+## Data recorded for model fitting
+
+Every horse in every race carries a `stats` record, which flows into **Download history (CSV)** alongside the outcome:
+
+- **From Brisnet PDFs:** days off; last / best-of-3 / average speed figures; average E1, E2 and LP pace figures over the last 3 races; speed vs the race par; life, surface and distance records with best figures and Brisnet pedigree ratings; jockey and trainer meet win %; Lasix; weight; Prime Power; counts of positive and negative QuickPlay comments; race pars and surface.
+- **From TVG (best effort, every race):** average and best speed, class ratings, average early/middle/finish pace, power rating, days off, jockey/trainer record (columns starting `tvg_`), plus win pool size and late changes.
+- **Odds movement:** morning line, `steam_ml` (log of ML odds over odds at pull; positive = bet down), and `steam_10m` (the same over roughly the last 10 minutes of polls; polling starts at `PREPOLL_MTP`, default 20).
+
+Used right away:
+
+- **Pace figures:** the engine's %-early calculation gets average E1/E2/LP from the Brisnet PDF (or TVG's average pace when at least half the field lacks Brisnet figures; horses without figures get the field median). Before this, every horse got the engine's defaults. Note the engine only applies %-early in fast or soft pace scenarios, not balanced ones.
+- **Surface changes** (e.g. off the turf) put a warning at the top of the ticket. Set `SURFACE_CHANGE_ACTION=skip` to bet nothing in those races.
+- **Pool-size caps:** each win bet is capped at `MAX_POOL_SHARE` (default 2%) of the win pool so small pools don't swallow your own price.
+
 ## How the timing works
 
 - Times are based on the race's post time, and the tote can update it. Starting at 15 MTP the scheduler polls the source every 60 s. If the source reports a later post time ("post drag"), the 3-minute and 2-minute marks move with it.

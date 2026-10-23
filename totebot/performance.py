@@ -101,9 +101,13 @@ def history_rows(races: Sequence[Race], tz_name: str) -> List[Dict[str, Any]]:
                 "odds_at_pull": r["odds"], "odds_final": final.get(num, ""),
                 "p_fund": r["p_fund"], "pace_mod": r.get("pace_mod", 0.0), "p_paced": round(p_paced, 4),
                 "p_public": r["p_public"], "p_true": r["p_true"], "ev": r["ev"],
+                "pct_early": r.get("pct_early", ""),
                 "win_stake": stakes.get(num, 0),
+                "win_pool": race.tickets.get("win_pool") or "",
+                "surface_change": race.tickets.get("surface_change") or "",
                 "finish_pos": finish.index(num) + 1 if num in finish else "",
                 "won": int(bool(finish) and finish[0] == num),
+                **(r.get("stats") or {}),
             })
     return out
 
