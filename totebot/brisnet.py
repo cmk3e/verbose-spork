@@ -64,10 +64,10 @@ def _post_times(times: Dict[int, tuple], day: datetime) -> Dict[int, datetime]:
 
 
 def parse_pages(pages: List[str]) -> List[dict]:
-    """Race dicts (track, race_number, post_time ISO, runners) from the text of each PDF page."""
-    races: Dict[int, dict] = {}
-    times: Dict[int, tuple] = {}
-    day: Optional[datetime] = None
+    """Race dicts (track, race_number, post_time ISO, runners) from the text of each PDF page.
+    One PDF may hold several tracks; races are kept apart by track and date."""
+    races: Dict[tuple, dict] = {}                     # (track name, date, race number) -> race
+    times: Dict[tuple, Dict[int, tuple]] = {}         # (track name, date) -> {race number: (h, m)}
     for text in pages:
         header = HEADER.search(text)
         if not header:
@@ -75,13 +75,14 @@ def parse_pages(pages: List[str]) -> List[dict]:
         num = int(header.group("race"))
         name = _track_name(header.group("rest"))
         day = datetime.strptime(header.group("date"), "%B %d, %Y").replace(tzinfo=ZoneInfo(BRISNET_TZ))
-        race = races.setdefault(num, {
+        card = (name, day)
+        race = races.setdefault((name, day, num), {
             "track": TRACK_CODES.get(name.lower(), name), "track_name": name,
             "race_number": num, "runners": [],
         })
         post = POST.search(text)
         if post:
-            times[num] = (int(post.group(1)), int(post.group(2)))
+            times.setdefault(card, {})[num] = (int(post.group(1)), int(post.group(2)))
         horses = list(HORSE.finditer(text))
         for i, h in enumerate(horses):
             block = text[h.end(): horses[i + 1].start() if i + 1 < len(horses) else len(text)]
@@ -98,18 +99,19 @@ def parse_pages(pages: List[str]) -> List[dict]:
                 "ml_odds": ml.group(1).replace("/", "-") if ml else "",
                 "rating": float(prime.group(1)) if prime else "",
             })
-    if not races or day is None:
+    if not races:
         raise BrisnetError("No Brisnet Ultimate PP races found in this PDF")
-    posts = _post_times(times, day)
+    posts = {card: _post_times(t, card[1]) for card, t in times.items()}
     out = []
-    for num in sorted(races):
-        race = races[num]
-        if num not in posts:
-            raise BrisnetError(f"No post time found for race {num}")
+    for (name, day, num), race in sorted(races.items(), key=lambda kv: (kv[0][1], kv[0][0], kv[0][2])):
+        post = posts.get((name, day), {}).get(num)
+        if post is None:
+            raise BrisnetError(f"No post time found for {name} race {num}")
         seen = set()
         race["runners"] = [r for r in race["runners"] if not (r["program_num"] in seen or seen.add(r["program_num"]))]
-        race["post_time"] = posts[num].isoformat()
+        race["post_time"] = post.isoformat()
         out.append(race)
+    out.sort(key=lambda r: r["post_time"])
     return out
 
 

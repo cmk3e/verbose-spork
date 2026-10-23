@@ -336,3 +336,53 @@ def test_tvg_fetch_uses_track_and_race(tmp_path):
     assert seen["trackAbbr"] == "BEL" and seen["raceNumber"] == "5"
     assert snap.source == "tvg" and "4" in snap.win_odds
     run(src.aclose())
+
+
+TVG_TRACKS = {"BEL": "Belmont", "KEE": "Keeneland", "GP": "Gulfstream Park", "LRL": "Laurel Park",
+              "WVD": "GB - Wolverhampton", "DED": "Delta Downs", "CHS": "Harrahs Philadelphia"}
+
+
+@pytest.mark.parametrize("names,code", [
+    (["BEL"], "BEL"), (["Belmont Park"], "BEL"), (["Keeneland"], "KEE"), (["Laurel Park"], "LRL"),
+    (["Wolverhampton"], "WVD"), (["Delta Downs"], "DED"), (["Harrah's Philadelphia"], "CHS"),
+    (["Santa Anita"], None),
+])
+def test_tvg_match_track(names, code):
+    from totebot.sources.tvg import match_track
+
+    assert match_track(names, TVG_TRACKS) == code
+
+
+def test_tvg_resolves_unlisted_track_by_name():
+    import httpx
+    from totebot.sources.tvg import TvgToteSource
+
+    asked = []
+
+    def handler(request):
+        body = json.loads(request.content)
+        if body["operationName"] == "getTracks":
+            return httpx.Response(200, json={"data": {"tracks": [{"code": c, "name": n} for c, n in TVG_TRACKS.items()]}})
+        asked.append(body["variables"]["trackAbbr"])
+        return httpx.Response(200, json=tvg_payload())
+
+    src = TvgToteSource()
+    src.client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    race = sample_race()
+    race.track, race.source_ref = "Delta Downs", None
+    run(src.fetch(race))
+    race.track = "Nowhere Downs"
+    with pytest.raises(ToteUnavailable):
+        run(src.fetch(race))
+    assert asked == ["DED"]
+    run(src.aclose())
+
+
+def test_brisnet_multi_track_pdf():
+    from totebot.brisnet import parse_pages
+
+    kee = BRISNET_PAGE.replace("Belmont Park", "Keeneland")
+    races = parse_pages([BRISNET_PAGE.format(race=3, post="2:16"), kee.format(race=3, post="1:35"),
+                         BRISNET_PAGE.format(race=4, post="2:49")])
+    assert [(r["track"], r["race_number"], r["post_time"][11:16]) for r in races] == [
+        ("KEE", 3, "13:35"), ("BEL", 3, "14:16"), ("BEL", 4, "14:49")]
