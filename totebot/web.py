@@ -123,8 +123,15 @@ def create_app(settings: Optional[Settings] = None, start_scheduler: bool = True
         data = await file.read()
         try:
             if data[:5] == b"%PDF-":
-                parsed = await asyncio.to_thread(brisnet.parse_pdf, data)  # big PDFs take a while
-                races = races_from_json(parsed, settings.timezone)
+                pages = await asyncio.to_thread(brisnet.pdf_pages, data)  # big PDFs take a while
+                try:
+                    races = races_from_json(brisnet.parse_pages(pages), settings.timezone)
+                except (CardError, ValueError) as e:
+                    upload_dir.mkdir(parents=True, exist_ok=True)
+                    (upload_dir / "last-rejected.pdf").write_bytes(data)
+                    (upload_dir / "last-rejected.txt").write_text(
+                        f"{file.filename}: {e}\n\n" + brisnet.diagnose(pages))
+                    raise ValueError(f"{e} (details: open /debug/upload)") from e
                 return add_races(races, replace)
             text = data.decode("utf-8-sig")
             if (file.filename or "").lower().endswith(".json") or text.lstrip().startswith(("{", "[")):
@@ -215,6 +222,25 @@ def create_app(settings: Optional[Settings] = None, start_scheduler: bool = True
         return race.to_dict()
 
     discovery_dir = Path(settings.data_dir) / "discovery"
+    upload_dir = Path(settings.data_dir) / "uploads"
+
+    @app.get("/debug/upload", include_in_schema=False, dependencies=[Depends(auth)])
+    def debug_upload():
+        """Why the last PDF upload was rejected."""
+        report = upload_dir / "last-rejected.txt"
+        body = (
+            '<button onclick="navigator.clipboard.writeText(document.getElementById(\'s\').innerText)'
+            '.then(()=>this.textContent=\'Copied\')">Copy report</button>'
+            f'<pre id="s">{html.escape(report.read_text())}</pre>'
+        ) if report.exists() else "<p>No rejected uploads.</p>"
+        return HTMLResponse(
+            '<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Upload report</title>'
+            "<style>body{font-family:-apple-system,system-ui,sans-serif;margin:16px;background:#fff;color:#111}"
+            "pre{white-space:pre-wrap;word-break:break-all;font-size:12px;background:#f3f4f6;padding:12px;border-radius:8px}"
+            "button{font:inherit;padding:10px 16px;min-height:44px}"
+            "@media (prefers-color-scheme:dark){body{background:#0e1116;color:#e6edf3}pre{background:#161b22}}</style>"
+            f"<h1>Last rejected upload</h1>{body}"
+        )
 
     @app.get("/discovery", include_in_schema=False, dependencies=[Depends(auth)])
     def discovery():

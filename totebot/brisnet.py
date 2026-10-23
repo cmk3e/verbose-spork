@@ -117,11 +117,28 @@ def parse_pages(pages: List[str]) -> List[dict]:
     return out
 
 
-def parse_pdf(data: bytes) -> List[dict]:
+def pdf_pages(data: bytes) -> List[str]:
     from pypdf import PdfReader
 
-    reader = PdfReader(io.BytesIO(data))
-    return parse_pages([p.extract_text() or "" for p in reader.pages])
+    return [p.extract_text() or "" for p in PdfReader(io.BytesIO(data)).pages]
+
+
+def parse_pdf(data: bytes) -> List[dict]:
+    return parse_pages(pdf_pages(data))
+
+
+def diagnose(pages: List[str]) -> str:
+    """Plain-text report on a PDF the reader could not use: which pages look like Brisnet PPs,
+    plus samples of the ones that don't, so the format can be added."""
+    brisnet = [i for i, t in enumerate(pages) if HEADER.search(t)]
+    other = [i for i, t in enumerate(pages) if i not in brisnet and t.strip()]
+    lines = [f"{len(pages)} pages; {len(brisnet)} look like Brisnet Ultimate PP pages; "
+             f"{len(other)} other pages with text; {len(pages) - len(brisnet) - len(other)} without text (scanned images?)"]
+    for i in brisnet[:3]:
+        lines.append(f"\n--- page {i + 1} (Brisnet) header: {HEADER.search(pages[i]).group(0)[:200]}")
+    for i in other[:3]:
+        lines.append(f"\n--- page {i + 1} (not recognised), first 2000 characters:\n{pages[i][:2000]}")
+    return "\n".join(lines)
 
 
 CSV_COLUMNS = ["track", "race_number", "post_time", "program_num", "name", "style", "qsp",

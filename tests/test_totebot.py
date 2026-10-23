@@ -418,3 +418,17 @@ def test_run_now_early_is_preview_then_auto_pull(tmp_path):
     store.save(late)
     run(sched.run_now(late))
     assert late.status == "published"
+
+
+def test_rejected_pdf_report(tmp_path, monkeypatch):
+    from totebot import brisnet
+
+    monkeypatch.setattr(brisnet, "pdf_pages", lambda data: ["Cover page", "EQUINELINE Race 1 something"])
+    app = create_app(settings(tmp_path, password="pw"), start_scheduler=False)
+    with TestClient(app) as c:
+        c.auth = ("admin", "pw")
+        r = c.post("/api/races/upload", files={"file": ("x.pdf", b"%PDF-1.4 fake", "application/pdf")})
+        assert r.status_code == 422 and "/debug/upload" in r.json()["detail"]
+        page = c.get("/debug/upload").text
+        assert "2 pages; 0 look like Brisnet" in page and "EQUINELINE Race 1" in page
+        assert (tmp_path / "uploads" / "last-rejected.pdf").exists()
