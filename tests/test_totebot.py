@@ -763,3 +763,20 @@ def test_history_csv_includes_stats(tmp_path):
         header = c.get("/api/performance/history.csv").text.splitlines()[0].split(",")
         for col in ("pct_early", "win_pool", "odds_ml", "steam_ml", "won"):
             assert col in header
+
+
+def test_replace_keeps_published_races(tmp_path, monkeypatch):
+    from totebot import brisnet
+
+    monkeypatch.setattr(brisnet, "pdf_pages", lambda data: [BRISNET_PAGE.format(race=3, post="11:16"), BRISNET_PAGE.format(race=4, post="11:49")])
+    app = create_app(settings(tmp_path, password="pw"), start_scheduler=False)
+    with TestClient(app) as c:
+        c.auth = ("admin", "pw")
+        first = c.post("/api/races/upload", files={"file": ("a.pdf", b"%PDF-1.4", "application/pdf")}).json()
+        ran = app.state.store.get(first["races"][0]["id"])
+        ran.status, ran.tickets = "published", TICKETS
+        app.state.store.save(ran)
+        again = c.post("/api/races/upload", files={"file": ("a.pdf", b"%PDF-1.4", "application/pdf")}, data={"replace": "true"}).json()
+        assert [r["race_number"] for r in again["races"]] == [4]
+        assert again["skipped"] == ["BEL R3: kept, tickets already published"]
+        assert app.state.store.get(ran.id).tickets == TICKETS

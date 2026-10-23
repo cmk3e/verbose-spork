@@ -68,10 +68,15 @@ def create_app(settings: Optional[Settings] = None, start_scheduler: bool = True
         there instead of failing the request."""
         out = []
         for race in races:
-            if store.get(race.id) and not replace:
+            existing = store.get(race.id)
+            if existing and not replace:
                 if skipped is None:
                     raise HTTPException(409, f"{race.id} already exists (send replace=true to overwrite)")
                 skipped.append(f"{race.track} R{race.race_number}: already loaded (tick Replace to overwrite)")
+                continue
+            if existing and existing.status == "published" and skipped is not None:
+                # Never wipe a race that already ran: its tickets and result feed the performance stats.
+                skipped.append(f"{race.track} R{race.race_number}: kept, tickets already published")
                 continue
             store.save(race)
             out.append(race.to_dict())
