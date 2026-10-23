@@ -8,18 +8,23 @@ from . import notify
 from .config import Settings
 from .handicap import run_handicap
 from .models import Race, ToteSnapshot, utcnow
+from .performance import settle
 from .sources import ToteSource, ToteUnavailable
 from .store import RaceStore
 
 log = logging.getLogger(__name__)
 
 POST_TIME_TOLERANCE_S = 30
+RESULT_FIRST_CHECK_MIN = 3      # start looking for the official result this long after post
+RESULT_CHECK_INTERVAL_S = 120
+RESULT_GIVE_UP_MIN = 180
 
 
 class RaceScheduler:
     """Pulls the tote at FETCH_MTP, computes tickets, and releases them at PUBLISH_MTP.
 
     Before the fetch window it pre-polls the source so a delayed post time moves the schedule.
+    After post it collects the official result and settles the published tickets.
     """
 
     def __init__(self, settings: Settings, store: RaceStore, source: ToteSource):
@@ -50,7 +55,7 @@ class RaceScheduler:
             await asyncio.sleep(self.s.tick_seconds)
 
     async def tick(self, now: Optional[datetime] = None) -> None:
-        races = [r for r in self.store.all() if r.status in ("scheduled", "preview", "ready")]
+        races = [r for r in self.store.all() if r.status in ("scheduled", "preview", "ready") or self._awaiting_result(r)]
         await asyncio.gather(*(self._process(r, now) for r in races))
 
     async def _process(self, race: Race, now: Optional[datetime]) -> None:
@@ -71,6 +76,42 @@ class RaceScheduler:
                     await self._prepoll(race, now)
             if race.status == "ready" and race.mtp(now) <= self.s.publish_mtp:
                 await self._publish(race, now)
+            if self._awaiting_result(race):
+                await self._check_result(race, now)
+
+    @staticmethod
+    def _awaiting_result(race: Race) -> bool:
+        return race.status == "published" and bool(race.tickets) and race.result_status not in ("official", "unavailable")
+
+    async def _check_result(self, race: Race, now: datetime) -> None:
+        since_post = -race.mtp(now)
+        if since_post < RESULT_FIRST_CHECK_MIN:
+            return
+        if since_post > RESULT_GIVE_UP_MIN:
+            race.result_status = "unavailable"
+            race.note("No official result found; giving up", now)
+            self.store.save(race)
+            return
+        if race.last_result_check and (now - race.last_result_check).total_seconds() < RESULT_CHECK_INTERVAL_S:
+            return
+        race.last_result_check = now
+        race.result_status = "pending"
+        try:
+            result = await self.source.fetch_result(race)
+        except Exception as e:  # keep trying until RESULT_GIVE_UP_MIN
+            log.warning("Result check failed for %s: %s", race.id, e)
+            result = None
+        if result:
+            self.record_result(race, result, now)
+        self.store.save(race)
+
+    def record_result(self, race: Race, result: dict, now: Optional[datetime] = None) -> None:
+        race.result = result
+        race.settlement = settle(race.tickets or {}, result)
+        race.result_status = "official"
+        total = race.settlement["total"]
+        race.note(f"Result {'-'.join(result['finish'][:4])}; tickets cost ${total['cost']:.2f}, "
+                  f"returned ${total['return']:.2f} ({total['profit']:+.2f})", now)
 
     def _prepoll_due(self, race: Race, now: datetime) -> bool:
         return race.last_prepoll is None or (now - race.last_prepoll).total_seconds() >= self.s.prepoll_interval_s

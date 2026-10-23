@@ -470,3 +470,149 @@ def test_upload_skips_existing_races(tmp_path, monkeypatch):
         assert len(first["races"]) == 2 and first["skipped"] == []
         again = c.post("/api/races/upload", files={"file": ("a.pdf", b"%PDF-1.4", "application/pdf")}).json()
         assert again["races"] == [] and len(again["skipped"]) == 2
+
+
+# --- results & performance ---------------------------------------------
+
+TICKETS = {
+    "win_bets": [{"program_num": "4", "stake": 10.0, "odds": 4.0}, {"program_num": "6", "stake": 4.0, "odds": 8.0},
+                 {"program_num": "3", "stake": 2.0, "odds": 9.0}],
+    "exotics": {
+        "exacta": {"base": 1.0, "combos": [{"combo": ["4", "6"], "est_payout_per_$1": 20.0},
+                                           {"combo": ["6", "4"], "est_payout_per_$1": 25.0}]},
+        "superfecta": {"base": 0.1, "combos": [{"combo": ["4", "6", "8", "1"], "est_payout_per_$1": 500.0}]},
+    },
+    "runners": [
+        {"program_num": "4", "name": "A", "odds": 4.0, "p_fund": 0.4, "pace_mod": 0.0, "p_public": 0.3, "p_true": 0.35, "ev": 0.2},
+        {"program_num": "6", "name": "B", "odds": 8.0, "p_fund": 0.3, "pace_mod": 0.1, "p_public": 0.15, "p_true": 0.2, "ev": 0.1},
+        {"program_num": "8", "name": "C", "odds": 3.0, "p_fund": 0.2, "pace_mod": 0.0, "p_public": 0.35, "p_true": 0.3, "ev": -0.1},
+        {"program_num": "1", "name": "D", "odds": 6.0, "p_fund": 0.1, "pace_mod": 0.0, "p_public": 0.2, "p_true": 0.15, "ev": -0.1},
+    ],
+}
+RESULT = {"finish": ["4", "6", "8", "1"], "final_odds": {"4": 3.5, "6": 9.0, "8": 3.0, "1": 6.0},
+          "scratched": ["3"], "payoffs": {"win": {"4": 3.4}, "exacta": {"4-6": 18.5}}, "source": "test"}
+
+
+def test_settle():
+    from totebot.performance import settle
+
+    s = settle(TICKETS, RESULT)
+    bt = s["by_type"]
+    assert bt["win"] == {"bets": 3, "hits": 1, "cost": 16.0, "return": 36.0, "estimated": False, "profit": 20.0}
+    assert bt["exacta"]["return"] == 18.5 and bt["exacta"]["hits"] == 1
+    assert bt["superfecta"]["return"] == 50.0 and bt["superfecta"]["estimated"] is True
+    win4 = next(b for b in s["bets"] if b["type"] == "win" and b["selection"] == "4")
+    assert win4["clv"] == pytest.approx(4.0 / 3.5 - 1)
+    assert s["total"]["profit"] == pytest.approx(36 + 18.5 + 50 - 16 - 2 - 0.1)
+
+
+def test_tvg_parse_result():
+    from totebot.sources.tvg import parse_result
+
+    payload = {"data": {"race": {"status": {"code": "RO"},
+        "bettingInterests": [{"biNumber": 4, "currentOdds": {"numerator": 5, "denominator": 2}, "runners": [{"runnerId": "4", "scratched": False}]},
+                             {"biNumber": 3, "currentOdds": None, "runners": [{"runnerId": "3", "scratched": True}]}],
+        "results": {
+            "runners": [{"runnerNumber": "6", "finishPosition": 2, "betAmount": 2, "winPayoff": 0},
+                        {"runnerNumber": "4", "finishPosition": 1, "betAmount": 2, "winPayoff": 7.0}],
+            "payoffs": [{"wagerAmount": 1, "wagerType": {"name": "Exacta"}, "selections": [{"selection": "4/6", "payoutAmount": 12.5}]},
+                        {"wagerAmount": 0.1, "wagerType": {"name": "Superfecta"}, "selections": [{"selection": "4-6-8-1", "payoutAmount": 45.0}]}],
+        }}}}
+    r = parse_result(payload)
+    assert r["finish"] == ["4", "6"] and r["scratched"] == ["3"] and r["final_odds"] == {"4": 3.5}
+    assert r["payoffs"] == {"win": {"4": 3.5}, "exacta": {"4-6": 12.5}, "superfecta": {"4-6-8-1": 450.0}}
+    payload["data"]["race"]["status"]["code"] = "SK"
+    assert parse_result(payload) is None
+
+
+def test_scheduler_collects_result(tmp_path):
+    class ResultSource(FakeSource):
+        def __init__(self):
+            super().__init__()
+            self.result_calls = 0
+
+        async def fetch_result(self, race):
+            self.result_calls += 1
+            return RESULT if self.result_calls >= 2 else None
+
+    store = RaceStore(tmp_path)
+    race = sample_race(post_in_min=10)
+    race.status, race.tickets = "published", TICKETS
+    store.save(race)
+    src = ResultSource()
+    sched = RaceScheduler(settings(tmp_path), store, src)
+    run(sched.tick(race.post_time + timedelta(minutes=1)))
+    assert src.result_calls == 0
+    run(sched.tick(race.post_time + timedelta(minutes=4)))
+    assert race.result_status == "pending" and src.result_calls == 1
+    run(sched.tick(race.post_time + timedelta(minutes=5)))      # too soon to re-check
+    assert src.result_calls == 1
+    run(sched.tick(race.post_time + timedelta(minutes=7)))
+    assert race.result_status == "official" and race.settlement["total"]["profit"] > 0
+    run(sched.tick(race.post_time + timedelta(minutes=10)))
+    assert src.result_calls == 2
+    assert RaceStore(tmp_path).get(race.id).result_status == "official"
+
+
+def _simulated_races(n, alpha, beta, seed=7):
+    import math as m
+    import random
+    from totebot.models import Race as R
+    from totebot.performance import settle
+
+    rng = random.Random(seed)
+    races = []
+    for i in range(n):
+        k = rng.randint(5, 10)
+        fund = [rng.random() ** 2 + 0.02 for _ in range(k)]
+        pub = [f * m.exp(rng.gauss(0, 0.8)) for f in fund]
+        fund = [x / sum(fund) for x in fund]
+        pub = [x / sum(pub) for x in pub]
+        true = [f ** alpha * p ** beta for f, p in zip(fund, pub)]
+        true = [x / sum(true) for x in true]
+        winner = rng.choices(range(k), weights=true)[0]
+        rows = [{"program_num": str(j + 1), "name": "", "odds": 0.83 / pub[j], "p_fund": fund[j], "pace_mod": 0.0,
+                 "p_public": pub[j], "p_true": true[j], "ev": true[j] * 0.83 / pub[j] - 1} for j in range(k)]
+        tickets = {"win_bets": [], "exotics": {}, "runners": rows}
+        finish = [str(winner + 1)] + [str(j + 1) for j in range(k) if j != winner]
+        result = {"finish": finish, "final_odds": {r["program_num"]: r["odds"] for r in rows}, "payoffs": {}, "scratched": []}
+        race = R(id=f"SIM-{i}", track="SIM", race_number=1, post_time=utcnow(), runners=[], status="published",
+                 tickets=tickets, result=result, settlement=settle(tickets, result), result_status="official")
+        races.append(race)
+    return races
+
+
+def test_summarize_and_blend_fit(tmp_path):
+    from totebot.handicap import load_engine
+    from totebot.performance import summarize
+
+    races = _simulated_races(600, alpha=0.7, beta=0.5)
+    s = summarize(races, TZ, load_engine("horseplay_betting_engine_v3"))
+    assert s["races"] == 600
+    assert s["log_loss"]["p_true"] < s["log_loss"]["p_public"]     # the generating model beats the public
+    fit = s["blend_fit"]
+    assert fit["races"] == 600
+    assert abs(fit["alpha"] - 0.7) < 0.25 and abs(fit["beta"] - 0.5) < 0.25
+    assert sum(b["runners"] for b in s["calibration"]["model"]) == sum(len(r.tickets["runners"]) for r in races)
+    assert summarize(races[:10], TZ, load_engine("horseplay_betting_engine_v3"))["blend_fit"] is None
+
+
+def test_performance_pages_and_manual_result(tmp_path):
+    app = create_app(settings(tmp_path, password="pw"), start_scheduler=False)
+    store = app.state.store
+    race = sample_race(post_in_min=-20)
+    race.status, race.tickets = "published", TICKETS
+    store.save(race)
+    with TestClient(app) as c:
+        c.auth = ("admin", "pw")
+        assert "No settled races yet" in c.get("/performance").text
+        r = c.post(f"/api/races/{race.id}/result", json={"finish": ["4", "6", "8", "1"], "payoffs": {"win": {"4": 3.4}},
+                                                          "final_odds": {"4": "5-2"}, "scratched": ["3"]})
+        assert r.status_code == 200 and r.json()["result_status"] == "official"
+        listed = c.get("/api/races").json()[0]
+        assert listed["finish"] == ["4", "6", "8", "1"] and listed["profit"] is not None
+        page = c.get("/performance").text
+        assert "Return by bet type" in page and "Small sample" in page
+        csv_text = c.get("/api/performance/history.csv").text
+        assert csv_text.startswith("date,race_id,track") and csv_text.count("\n") == 5
+        assert c.get("/api/performance").json()["races"] == 1

@@ -115,6 +115,13 @@ class Race:
     tickets: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
     last_prepoll: Optional[datetime] = None
+    # After the race: official result and how the tickets did (see totebot/performance.py).
+    #   result = {"finish": [...], "final_odds": {num: decimal}, "scratched": [...],
+    #             "payoffs": {"win"|"exacta"|"trifecta"|"superfecta": {"4-6": per $1}}, "official_at", "source"}
+    result: Optional[Dict[str, Any]] = None
+    settlement: Optional[Dict[str, Any]] = None
+    result_status: Optional[str] = None      # None | "pending" | "official" | "unavailable"
+    last_result_check: Optional[datetime] = None
     log: List[str] = field(default_factory=list)
 
     def mtp(self, now: Optional[datetime] = None) -> float:
@@ -140,6 +147,10 @@ class Race:
             "tickets": self.tickets,
             "error": self.error,
             "last_prepoll": _iso(self.last_prepoll),
+            "result": self.result,
+            "settlement": self.settlement,
+            "result_status": self.result_status,
+            "last_result_check": _iso(self.last_result_check),
             "log": self.log,
         }
 
@@ -158,5 +169,9 @@ class Race:
             tickets=d.get("tickets"),
             error=d.get("error"),
             last_prepoll=_parse_dt(d.get("last_prepoll")),
+            result=d.get("result"),
+            settlement=d.get("settlement"),
+            result_status=d.get("result_status"),
+            last_result_check=_parse_dt(d.get("last_result_check")),
             log=list(d.get("log", [])),
         )

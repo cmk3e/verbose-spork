@@ -79,6 +79,80 @@ def match_track(candidates: List[str], tracks: Dict[str, str]) -> Optional[str]:
     return None
 
 
+RESULT_QUERY = """
+query getRaceResult($trackAbbr: String, $raceNumber: String, $wagerProfile: String) {
+  race(track: $trackAbbr, number: $raceNumber, profile: $wagerProfile) {
+    number
+    status { code }
+    bettingInterests {
+      biNumber
+      currentOdds { numerator denominator }
+      runners { runnerId scratched }
+    }
+    results {
+      payoffs {
+        selections { payoutAmount selection }
+        wagerAmount
+        wagerType { id name }
+      }
+      runners { betAmount runnerNumber biNumber finishPosition finishStatus winPayoff placePayoff showPayoff }
+    }
+  }
+}
+"""
+OFFICIAL_STATUS = "RO"  # TVG: result official
+BET_TYPE_NAMES = {"win": "win", "exacta": "exacta", "trifecta": "trifecta", "superfecta": "superfecta"}
+
+
+def _selection_key(selection: Any) -> str:
+    """'4-6', '4/6', '4,6' or '4 6' -> '4-6'."""
+    return "-".join(p for p in re.split(r"[^0-9A-Za-z]+", str(selection)) if p)
+
+
+def parse_result(data: Dict[str, Any], source: str = "tvg") -> Optional[Dict[str, Any]]:
+    """Official result in Race.result shape, or None while the race isn't official yet."""
+    race = (data.get("data") or {}).get("race")
+    if not race:
+        return None
+    status = ((race.get("status") or {}).get("code") or "").upper()
+    results = race.get("results") or {}
+    finishers = [r for r in results.get("runners") or [] if r.get("finishPosition")]
+    if status != OFFICIAL_STATUS or not finishers:
+        return None
+    finishers.sort(key=lambda r: (int(r["finishPosition"]), str(r.get("runnerNumber"))))
+    finish = [str(r.get("runnerNumber") or r.get("biNumber")).strip() for r in finishers]
+
+    final_odds: Dict[str, float] = {}
+    scratched = []
+    for bi in race.get("bettingInterests") or []:
+        dec = odds_to_decimal(bi.get("currentOdds"))
+        for runner in bi.get("runners") or []:
+            num = str(runner.get("runnerId") or bi.get("biNumber")).strip()
+            if runner.get("scratched"):
+                scratched.append(num)
+            elif dec is not None:
+                final_odds[num] = dec
+
+    payoffs: Dict[str, Dict[str, float]] = {}
+    for r in finishers:
+        if r.get("winPayoff"):
+            base = float(r.get("betAmount") or 2) or 2.0
+            payoffs.setdefault("win", {})[str(r.get("runnerNumber"))] = float(r["winPayoff"]) / base
+    for p in results.get("payoffs") or []:
+        name = ((p.get("wagerType") or {}).get("name") or "").lower()
+        kind = next((k for k in BET_TYPE_NAMES if k in name), None)
+        if kind is None or kind == "win":
+            continue
+        base = float(p.get("wagerAmount") or 1) or 1.0
+        for sel in p.get("selections") or []:
+            if sel.get("payoutAmount"):
+                payoffs.setdefault(kind, {})[_selection_key(sel.get("selection"))] = float(sel["payoutAmount"]) / base
+    return {
+        "official_at": utcnow().isoformat(), "finish": finish, "final_odds": final_odds,
+        "scratched": scratched, "payoffs": payoffs, "source": source,
+    }
+
+
 # TVG race status codes for races still taking bets (O = open, MO = morning odds, IC = in contention/near post).
 OPEN_STATUSES = {"O", "MO", "IC"}
 
@@ -193,6 +267,14 @@ class TvgToteSource(ToteSource):
         track = await self.resolve_track(race)
         return parse_race(await self.fetch_raw(track, race.race_number))
 
+    async def fetch_result_raw(self, track: str, race_number: int) -> Dict[str, Any]:
+        return await self._post("getRaceResult", RESULT_QUERY, {
+            "trackAbbr": track, "raceNumber": str(race_number), "wagerProfile": self.wager_profile})
+
+    async def fetch_result(self, race: Race) -> Optional[Dict[str, Any]]:
+        track = await self.resolve_track(race)
+        return parse_result(await self.fetch_result_raw(track, race.race_number))
+
     async def aclose(self) -> None:
         await self.client.aclose()
 
@@ -226,11 +308,29 @@ async def _check(track: str, race_number: int) -> None:
     print(f"  exacta probables: {len(snap.exacta_probables)} combos")
 
 
+async def _check_result(track: str, race_number: int) -> None:
+    src = TvgToteSource()
+    try:
+        track = match_track([track], await src.tracks()) or track
+        result = parse_result(await src.fetch_result_raw(track, race_number))
+    finally:
+        await src.aclose()
+    if result is None:
+        print(f"TVG {track} R{race_number}: not official yet")
+        return
+    print(f"TVG {track} R{race_number}: finish {'-'.join(result['finish'][:4])}")
+    for kind, pays in result["payoffs"].items():
+        print(f"  {kind}: " + ", ".join(f"{k} ${v:.2f} per $1" for k, v in pays.items()))
+
+
 if __name__ == "__main__":
     if sys.argv[1:] == ["tracks"]:
         asyncio.run(_list_tracks())
+    elif len(sys.argv) == 4 and sys.argv[1] == "result":
+        asyncio.run(_check_result(sys.argv[2], int(sys.argv[3])))
     elif len(sys.argv) == 3:
         asyncio.run(_check(sys.argv[1], int(sys.argv[2])))
     else:
         raise SystemExit("usage: python -m totebot.sources.tvg TRACK RACE   (e.g. BEL 3 or 'Delta Downs' 4)\n"
-                         "       python -m totebot.sources.tvg tracks      (today's TVG tracks)")
+                         "       python -m totebot.sources.tvg tracks      (today's TVG tracks)\n"
+                         "       python -m totebot.sources.tvg result BEL 3 (official result and payoffs)")

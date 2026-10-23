@@ -1,5 +1,7 @@
 import asyncio
+import csv
 import html
+import io
 import json
 import logging
 import re
@@ -11,13 +13,14 @@ from typing import Dict, List, Optional
 from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile, status
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 
-from . import brisnet
+from . import brisnet, performance, performance_page
 from .cards import CardError, parse_post_time, races_from_csv, races_from_json
 from .config import Settings, get_settings
+from .handicap import load_engine
 from .models import Race, ToteSnapshot, _parse_dt, utcnow
 from .odds import parse_odds
 from .scheduler import RaceScheduler
@@ -102,6 +105,8 @@ def create_app(settings: Optional[Settings] = None, start_scheduler: bool = True
                 d["total_cost"] = t.get("total_cost")
                 d.pop("snapshot")
                 d.pop("manual_tote")
+                d["profit"] = (d.pop("settlement") or {}).get("total", {}).get("profit")
+                d["finish"] = ((d.pop("result") or {}).get("finish") or [])[:4]
             out.append(d)
         return out
 
@@ -228,6 +233,49 @@ def create_app(settings: Optional[Settings] = None, start_scheduler: bool = True
         except ToteUnavailable as e:
             raise HTTPException(503, str(e))
         return race.to_dict()
+
+    class ResultIn(BaseModel):
+        finish: List[str]                                   # program numbers in finishing order
+        payoffs: Dict[str, Dict[str, float]] = {}           # {"exacta": {"4-6": 9.2}} per $1
+        final_odds: Dict[str, object] = {}                  # program_num -> "5-2" | 3.5
+        scratched: List[str] = []
+
+    @app.post("/api/races/{race_id}/result", dependencies=[Depends(auth)])
+    def enter_result(race_id: str, body: ResultIn):
+        """Record a result by hand (e.g. when the tote source can't report results)."""
+        race = get_race(race_id)
+        if not race.tickets:
+            raise HTTPException(409, "This race has no tickets to settle")
+        try:
+            final = {str(k): parse_odds(v) for k, v in body.final_odds.items()}
+        except ValueError as e:
+            raise HTTPException(422, str(e))
+        result = {"official_at": utcnow().isoformat(), "finish": [str(x) for x in body.finish],
+                  "final_odds": {k: v for k, v in final.items() if v}, "scratched": body.scratched,
+                  "payoffs": body.payoffs, "source": "manual"}
+        scheduler.record_result(race, result)
+        store.save(race)
+        return race.to_dict()
+
+    @app.get("/api/performance", dependencies=[Depends(auth)])
+    def performance_json():
+        return performance.summarize(store.all(), settings.timezone, load_engine(settings.engine_module))
+
+    @app.get("/performance", include_in_schema=False, dependencies=[Depends(auth)])
+    def performance_html():
+        summary = performance.summarize(store.all(), settings.timezone, load_engine(settings.engine_module))
+        return HTMLResponse(performance_page.render(summary, settings))
+
+    @app.get("/api/performance/history.csv", dependencies=[Depends(auth)])
+    def performance_csv():
+        rows = performance.history_rows(store.all(), settings.timezone)
+        buf = io.StringIO()
+        if rows:
+            w = csv.DictWriter(buf, fieldnames=list(rows[0]))
+            w.writeheader()
+            w.writerows(rows)
+        return PlainTextResponse(buf.getvalue(), media_type="text/csv",
+                                 headers={"Content-Disposition": 'attachment; filename="totebot-history.csv"'})
 
     discovery_dir = Path(settings.data_dir) / "discovery"
     upload_dir = Path(settings.data_dir) / "uploads"

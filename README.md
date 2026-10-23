@@ -94,6 +94,18 @@ To support a provider whose API doesn't fit the JSON mapping, add a class in `to
 
 > **Choosing a feed:** there is no free, official public API for live US tote data. Your options are a commercial racing data provider, an ADW account that offers data access, or your own scraper feeding the `manual` endpoint. Check the terms of service for whichever you use.
 
+## Results and performance
+
+A few minutes after each published race goes official, Totebot pulls the result, final odds and payoffs from TVG and settles that race's tickets as paper bets (as if every ticket was bet exactly as printed). Open **Performance** in the header for:
+
+- **Return by bet type**: cost, return, profit and ROI for win, exacta and superfecta.
+- **Is there an edge?**: log loss of the model's probabilities vs the public's on the actual winners. The model has to beat the public here to be worth betting.
+- **Closing-line value**: the odds at the 3 MTP pull vs the final odds, for your win bets and for every overlay.
+- **Calibration**: predicted vs actual win rates, for the model and for the public.
+- **Fitted blend**: after 100 settled races, the `BLEND_ALPHA` / `BLEND_BETA` that best fit your results (Benter's second stage, using the engine's `ConditionalLogitModel`).
+
+**Download history (CSV)** gives one row per horse per race (probabilities, odds at pull and final, finish), for fitting the engine further. If a source can't report results, record one with `POST /api/races/{id}/result` (`{"finish": ["4","6","8","1"], "payoffs": {"exacta": {"4-6": 9.2}}}`, payoffs per $1). Check TVG's result for a race from `/opt/totebot` with `.venv/bin/python -m totebot.sources.tvg result BEL 3`.
+
 ## How the timing works
 
 - Times are based on the race's post time, and the tote can update it. Starting at 15 MTP the scheduler polls the source every 60 s. If the source reports a later post time ("post drag"), the 3-minute and 2-minute marks move with it.
