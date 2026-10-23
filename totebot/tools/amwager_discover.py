@@ -85,7 +85,20 @@ async def first_visible(locator) -> Optional[Any]:
     return None
 
 
-async def run(track: str, out: Path, url: Optional[str], watch_s: int, headed: bool, start_url: str = START_URL) -> None:
+async def find_password(page):
+    """(frame, password input) for the first visible password box in the page or any iframe."""
+    for frame in page.frames:
+        try:
+            box = await first_visible(frame.locator("input[type=password]"))
+        except Exception:
+            continue
+        if box is not None:
+            return frame, box
+    return None, None
+
+
+async def run(track: str, out: Path, url: Optional[str], watch_s: int, headed: bool, start_url: str = START_URL,
+              login_url: Optional[str] = None) -> None:
     from playwright.async_api import async_playwright
 
     load_env_file()
@@ -154,19 +167,43 @@ async def run(track: str, out: Path, url: Optional[str], watch_s: int, headed: b
         await page.wait_for_timeout(5000)
         await snap(page, "1-home")
 
-        # Log in: open a login form if none is showing, then fill the visible username/password fields.
-        pw_box = await first_visible(page.locator("input[type=password]"))
+        say(f"Home page title: {scrub(await page.title())!r}  url: {scrub(page.url)}")
+        if login_url:
+            try:
+                await page.goto(login_url, wait_until="domcontentloaded", timeout=45_000)
+                await page.wait_for_timeout(4000)
+            except Exception as e:
+                say(f"Could not load {login_url}: {e}")
+
+        # Log in: find a password box in the page or any iframe, opening a login form first if needed.
+        frame, pw_box = await find_password(page)
         if pw_box is None:
-            opener = await first_visible(page.get_by_role("button", name=re.compile(r"log\s*in|sign\s*in", re.I)))
-            opener = opener or await first_visible(page.get_by_role("link", name=re.compile(r"log\s*in|sign\s*in", re.I)))
-            if opener:
-                await opener.click()
-                await page.wait_for_timeout(3000)
-            pw_box = await first_visible(page.locator("input[type=password]"))
+            login_re = re.compile(r"^\s*(log\s*in|sign\s*in|login)\s*$", re.I)
+            for candidate in (
+                page.get_by_role("button", name=login_re),
+                page.get_by_role("link", name=login_re),
+                page.get_by_text(login_re),
+                page.locator("[href*=login i], [class*=login i], [id*=login i]"),
+            ):
+                opener = await first_visible(candidate)
+                if opener is None:
+                    continue
+                try:
+                    await opener.click()
+                except Exception:
+                    continue
+                await page.wait_for_timeout(4000)
+                frame, pw_box = await find_password(page)
+                if pw_box is not None:
+                    break
         if pw_box is None:
-            say("Login: no password field found (see 1-home.png)")
+            await snap(page, "2-no-login-form")
+            say("Login: no password field found (see 1-home.png and 2-no-login-form.png)")
+            say("Frames: " + ", ".join(scrub(f.url)[:120] for f in page.frames))
         else:
-            inputs = page.locator("input:not([type=hidden]):not([type=password]):not([type=checkbox]):not([type=radio])")
+            if frame is not page.main_frame:
+                say(f"Login form is inside an iframe: {scrub(frame.url)[:150]}")
+            inputs = frame.locator("input:not([type=hidden]):not([type=password]):not([type=checkbox]):not([type=radio])")
             user_box = None
             for i in range(await inputs.count()):
                 el = inputs.nth(i)
@@ -180,14 +217,14 @@ async def run(track: str, out: Path, url: Optional[str], watch_s: int, headed: b
                 await snap(page, "2-login-filled")
                 await pw_box.press("Enter")
                 await page.wait_for_timeout(4000)
-                if await first_visible(page.locator("input[type=password]")):
-                    submit = await first_visible(page.locator("button[type=submit], input[type=submit]"))
+                if (await find_password(page))[1] is not None:
+                    submit = await first_visible(frame.locator("button[type=submit], input[type=submit]"))
                     submit = submit or await first_visible(
-                        page.get_by_role("button", name=re.compile(r"log\s*in|sign\s*in|submit|continue", re.I)))
+                        frame.get_by_role("button", name=re.compile(r"log\s*in|sign\s*in|submit|continue", re.I)))
                     if submit:
                         await submit.click()
                 await page.wait_for_timeout(8000)
-                still = await first_visible(page.locator("input[type=password]"))
+                still = (await find_password(page))[1]
                 say("Login: " + ("password field still visible, may have FAILED (see 3-after-login.png)" if still else "looks OK"))
         await snap(page, "3-after-login")
 
@@ -260,12 +297,13 @@ def main() -> None:
     ap.add_argument("--url", help="open this AmWager URL after login instead of clicking the track")
     ap.add_argument("--watch", type=int, default=60, help="seconds to keep recording on the track page")
     ap.add_argument("--start-url", default=START_URL)
+    ap.add_argument("--login-url", help="AmWager's login page, if logging in from the home page fails")
     ap.add_argument("--headed", action="store_true", help="show the browser (needs a display)")
     ap.add_argument("--out", default=None, help="output dir (default $DATA_DIR/discovery)")
     args = ap.parse_args()
     load_env_file()
     out = Path(args.out or Path(os.environ.get("DATA_DIR", "data")) / "discovery")
-    asyncio.run(run(args.track, out, args.url, args.watch, args.headed, args.start_url))
+    asyncio.run(run(args.track, out, args.url, args.watch, args.headed, args.start_url, args.login_url))
 
 
 if __name__ == "__main__":
