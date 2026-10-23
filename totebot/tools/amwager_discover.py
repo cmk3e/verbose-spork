@@ -1,4 +1,5 @@
-"""One-off discovery run: log in to AmWager, open a track, and record how the site delivers odds.
+"""One-off discovery run: open an odds site (logging in to AmWager, or a public page with --no-login),
+open a track, and record how the site delivers odds.
 
 Writes screenshots, captured JSON/websocket traffic and a sanitized summary to
 $DATA_DIR/discovery/, which Totebot shows at /discovery. Credentials come from
@@ -115,12 +116,12 @@ async def find_password(page):
 
 
 async def run(track: str, out: Path, url: Optional[str], watch_s: int, headed: bool, start_url: str = START_URL,
-              login_url: Optional[str] = None) -> None:
+              login_url: Optional[str] = None, login: bool = True) -> None:
     from playwright.async_api import async_playwright
 
     load_env_file()
     user, pw = os.environ.get("AMWAGER_USERNAME", ""), os.environ.get("AMWAGER_PASSWORD", "")
-    if not user or not pw:
+    if login and (not user or not pw):
         raise SystemExit(f"Set AMWAGER_USERNAME and AMWAGER_PASSWORD in {ENV_FILE}")
     scrub = Scrubber(user, pw)
 
@@ -185,8 +186,8 @@ async def run(track: str, out: Path, url: Optional[str], watch_s: int, headed: b
 
         visible = ""
         try:
-            say(f"AmWager discovery {datetime.now(timezone.utc):%Y-%m-%d %H:%M}Z  track={track!r}")
-            say(credential_report(user, pw))
+            say(f"Discovery {datetime.now(timezone.utc):%Y-%m-%d %H:%M}Z  track={track!r}")
+            say(credential_report(user, pw) if login else "No login (public page)")
             try:
                 await page.goto(start_url, wait_until="domcontentloaded", timeout=45_000)
             except Exception as e:
@@ -195,76 +196,77 @@ async def run(track: str, out: Path, url: Optional[str], watch_s: int, headed: b
             await snap(page, "1-home")
 
             say(f"Home page title: {scrub(await page.title())!r}  url: {scrub(page.url)}")
-            if login_url:
-                try:
-                    await page.goto(login_url, wait_until="domcontentloaded", timeout=45_000)
-                    await page.wait_for_timeout(4000)
-                except Exception as e:
-                    say(f"Could not load {login_url}: {e}")
-
-            # Log in: find a password box in the page or any iframe, opening a login form first if needed.
-            frame, pw_box = await find_password(page)
-            if pw_box is None:
-                login_re = re.compile(r"^\s*(log\s*in|sign\s*in|login)\s*$", re.I)
-                for candidate in (
-                    page.get_by_role("button", name=login_re),
-                    page.get_by_role("link", name=login_re),
-                    page.get_by_text(login_re),
-                    page.locator("[href*=login i], [class*=login i], [id*=login i]"),
-                ):
-                    opener = await first_visible(candidate)
-                    if opener is None:
-                        continue
+            if login:
+                if login_url:
                     try:
-                        await opener.click()
-                    except Exception:
-                        continue
-                    await page.wait_for_timeout(4000)
-                    frame, pw_box = await find_password(page)
-                    if pw_box is not None:
-                        break
-            if pw_box is None:
-                await snap(page, "2-no-login-form")
-                say("Login: no password field found (see 1-home.png and 2-no-login-form.png)")
-                say("Frames: " + ", ".join(scrub(f.url)[:120] for f in page.frames))
-            else:
-                if frame is not page.main_frame:
-                    say(f"Login form is inside an iframe: {scrub(frame.url)[:150]}")
-                user_box = await first_visible(frame.locator(
-                    "input[type=email], input[name*=mail i], input[id*=mail i], input[placeholder*=mail i], "
-                    "input[name*=user i], input[id*=user i], input[placeholder*=user i], input[autocomplete=username]"))
-                if user_box is None:
-                    # Fall back to the last visible text box that comes before the password box.
-                    inputs = frame.locator("input:not([type=hidden]):not([type=checkbox]):not([type=radio])")
-                    for i in range(await inputs.count()):
-                        el = inputs.nth(i)
-                        if await el.get_attribute("type") == "password":
+                        await page.goto(login_url, wait_until="domcontentloaded", timeout=45_000)
+                        await page.wait_for_timeout(4000)
+                    except Exception as e:
+                        say(f"Could not load {login_url}: {e}")
+
+                # Log in: find a password box in the page or any iframe, opening a login form first if needed.
+                frame, pw_box = await find_password(page)
+                if pw_box is None:
+                    login_re = re.compile(r"^\s*(log\s*in|sign\s*in|login)\s*$", re.I)
+                    for candidate in (
+                        page.get_by_role("button", name=login_re),
+                        page.get_by_role("link", name=login_re),
+                        page.get_by_text(login_re),
+                        page.locator("[href*=login i], [class*=login i], [id*=login i]"),
+                    ):
+                        opener = await first_visible(candidate)
+                        if opener is None:
+                            continue
+                        try:
+                            await opener.click()
+                        except Exception:
+                            continue
+                        await page.wait_for_timeout(4000)
+                        frame, pw_box = await find_password(page)
+                        if pw_box is not None:
                             break
-                        if await el.is_visible():
-                            user_box = el
-                if user_box is None:
-                    say("Login: no username field found")
+                if pw_box is None:
+                    await snap(page, "2-no-login-form")
+                    say("Login: no password field found (see 1-home.png and 2-no-login-form.png)")
+                    say("Frames: " + ", ".join(scrub(f.url)[:120] for f in page.frames))
                 else:
-                    await user_box.fill(user)
-                    await pw_box.fill(pw)
-                    attrs = [f"{a}={await user_box.get_attribute(a)!r}" for a in ("type", "name", "id", "placeholder")]
-                    say("Email box used: " + " ".join(attrs))
-                    typed_user = await user_box.input_value()
-                    typed_pw = await pw_box.input_value()
-                    say(f"Typed into form: email {'matches' if typed_user == user else 'DOES NOT match'} saved value; "
-                        f"password {'matches' if typed_pw == pw else 'DOES NOT match'} ({len(typed_pw)} chars)")
-                    await snap(page, "2-login-filled")
-                    await pw_box.press("Enter")
-                    await page.wait_for_timeout(4000)
-                    if (await find_password(page))[1] is not None:
-                        submit = await first_visible(frame.locator("button[type=submit], input[type=submit]"))
-                        submit = submit or await first_visible(
-                            frame.get_by_role("button", name=re.compile(r"log\s*in|sign\s*in|submit|continue", re.I)))
-                        if submit:
-                            await submit.click()
-                    await page.wait_for_timeout(8000)
-                    still = (await find_password(page))[1]
-                    say("Login: " + ("password field still visible, may have FAILED (see 3-after-login.png)" if still else "looks OK"))
+                    if frame is not page.main_frame:
+                        say(f"Login form is inside an iframe: {scrub(frame.url)[:150]}")
+                    user_box = await first_visible(frame.locator(
+                        "input[type=email], input[name*=mail i], input[id*=mail i], input[placeholder*=mail i], "
+                        "input[name*=user i], input[id*=user i], input[placeholder*=user i], input[autocomplete=username]"))
+                    if user_box is None:
+                        # Fall back to the last visible text box that comes before the password box.
+                        inputs = frame.locator("input:not([type=hidden]):not([type=checkbox]):not([type=radio])")
+                        for i in range(await inputs.count()):
+                            el = inputs.nth(i)
+                            if await el.get_attribute("type") == "password":
+                                break
+                            if await el.is_visible():
+                                user_box = el
+                    if user_box is None:
+                        say("Login: no username field found")
+                    else:
+                        await user_box.fill(user)
+                        await pw_box.fill(pw)
+                        attrs = [f"{a}={await user_box.get_attribute(a)!r}" for a in ("type", "name", "id", "placeholder")]
+                        say("Email box used: " + " ".join(attrs))
+                        typed_user = await user_box.input_value()
+                        typed_pw = await pw_box.input_value()
+                        say(f"Typed into form: email {'matches' if typed_user == user else 'DOES NOT match'} saved value; "
+                            f"password {'matches' if typed_pw == pw else 'DOES NOT match'} ({len(typed_pw)} chars)")
+                        await snap(page, "2-login-filled")
+                        await pw_box.press("Enter")
+                        await page.wait_for_timeout(4000)
+                        if (await find_password(page))[1] is not None:
+                            submit = await first_visible(frame.locator("button[type=submit], input[type=submit]"))
+                            submit = submit or await first_visible(
+                                frame.get_by_role("button", name=re.compile(r"log\s*in|sign\s*in|submit|continue", re.I)))
+                            if submit:
+                                await submit.click()
+                        await page.wait_for_timeout(8000)
+                        still = (await find_password(page))[1]
+                        say("Login: " + ("password field still visible, may have FAILED (see 3-after-login.png)" if still else "looks OK"))
             await snap(page, "3-after-login")
 
             # Open the track.
@@ -274,7 +276,7 @@ async def run(track: str, out: Path, url: Optional[str], watch_s: int, headed: b
                     say(f"Opened {url}")
                 except Exception as e:
                     say(f"Could not open {url}: {e}")
-            else:
+            elif track:
                 target = await first_visible(page.get_by_text(re.compile(re.escape(track), re.I)))
                 if target is None:
                     say(f"Track: no visible text matching {track!r} (see 3-after-login.png)")
@@ -342,12 +344,13 @@ def main() -> None:
     ap.add_argument("--watch", type=int, default=60, help="seconds to keep recording on the track page")
     ap.add_argument("--start-url", default=START_URL)
     ap.add_argument("--login-url", help="AmWager's login page, if logging in from the home page fails")
+    ap.add_argument("--no-login", action="store_true", help="public page: skip logging in")
     ap.add_argument("--headed", action="store_true", help="show the browser (needs a display)")
     ap.add_argument("--out", default=None, help="output dir (default $DATA_DIR/discovery)")
     args = ap.parse_args()
     load_env_file()
     out = Path(args.out or Path(os.environ.get("DATA_DIR", "data")) / "discovery")
-    asyncio.run(run(args.track, out, args.url, args.watch, args.headed, args.start_url, args.login_url))
+    asyncio.run(run(args.track, out, args.url, args.watch, args.headed, args.start_url, args.login_url, not args.no_login))
 
 
 if __name__ == "__main__":
