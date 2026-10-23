@@ -22,9 +22,10 @@ class Settings:
     password: str = ""
     public_url: str = ""
 
-    # Where live odds come from: mock | manual | http
+    # Where live odds come from: tvg | mock | manual | http
     tote_source: str = "mock"
     engine_module: str = "horseplay_betting_engine_v3"
+    tvg_wager_profile: str = "PORT-Generic"
 
     # Timing (minutes to post)
     fetch_mtp: float = 3.0
@@ -86,6 +87,7 @@ class Settings:
             public_url=_env("PUBLIC_URL").rstrip("/"),
             tote_source=_env("TOTE_SOURCE", "mock").lower(),
             engine_module=_env("ENGINE_MODULE", "horseplay_betting_engine_v3"),
+            tvg_wager_profile=_env("TVG_WAGER_PROFILE", "PORT-Generic"),
             fetch_mtp=_float("FETCH_MTP", 3.0),
             publish_mtp=_float("PUBLISH_MTP", 2.0),
             prepoll_mtp=_float("PREPOLL_MTP", 15.0),

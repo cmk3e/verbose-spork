@@ -76,6 +76,7 @@ Fundamentals are taken in this order: `p_fund` â†’ `features` + trained model â†
 
 | value | what it does |
 |---|---|
+| `tvg` | **Live odds from TVG's public race pages** (no account). Win odds, scratches, post-time changes (including post drag) and exacta probables. Uses the race's track code (e.g. `BEL`); set a race's `source_ref` if TVG's code differs. Check from the VM with `/opt/totebot/.venv/bin/python -m totebot.sources.tvg BEL 3`. |
 | `mock` | Simulated, fluctuating tote. Use it to try everything out. |
 | `http` | Any JSON odds API. Point `TOTE_HTTP_URL` at it and map the fields with `TOTE_HTTP_*` in `/etc/totebot.env`. Handles win odds, scratches, post-time changes and exacta probables (when provided, the engine uses real probables instead of estimates). |
 | `manual` | Uses odds pushed to `POST /api/races/{id}/tote`. A scraper or script you already have, running anywhere, can feed Totebot this way. |

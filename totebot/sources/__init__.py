@@ -3,6 +3,7 @@ from .base import ToteSource, ToteUnavailable
 from .http_json import HttpJsonToteSource
 from .manual import ManualToteSource
 from .mock import MockToteSource
+from .tvg import TvgToteSource
 
 
 def build_source(settings: Settings) -> ToteSource:
@@ -13,7 +14,9 @@ def build_source(settings: Settings) -> ToteSource:
         return ManualToteSource()
     if kind == "http":
         return HttpJsonToteSource(settings)
-    raise ValueError(f"Unknown TOTE_SOURCE {kind!r} (use mock, manual or http)")
+    if kind == "tvg":
+        return TvgToteSource(settings.tvg_wager_profile, settings.http_timeout_s)
+    raise ValueError(f"Unknown TOTE_SOURCE {kind!r} (use tvg, mock, manual or http)")
 
 
-__all__ = ["ToteSource", "ToteUnavailable", "build_source", "HttpJsonToteSource", "ManualToteSource", "MockToteSource"]
+__all__ = ["ToteSource", "ToteUnavailable", "build_source", "HttpJsonToteSource", "ManualToteSource", "MockToteSource", "TvgToteSource"]

@@ -280,3 +280,59 @@ def test_rating_imputes_minority_missing(tmp_path):
     snap = ToteSnapshot(taken_at=utcnow(), win_odds={"1": 15.0, "2": 8.0, "3": 3.0})
     out = run_handicap(race, snap, settings(tmp_path))
     assert out["fundamental_source"] == "rating (median 131.15 used for #2)"
+
+
+def tvg_payload(mtp=83, status="O", post="2026-10-23T18:16:00Z"):
+    def bi(n, num, den=None, scratched=False, runner_ids=None):
+        return {"biNumber": n, "currentOdds": {"numerator": num, "denominator": den},
+                "morningLineOdds": {"numerator": num, "denominator": den},
+                "runners": [{"runnerId": r, "scratched": scratched, "horseName": f"H{r}"} for r in (runner_ids or [str(n)])]}
+    return {"data": {"race": {
+        "number": "3", "mtp": mtp, "postTime": post, "status": {"code": status},
+        "bettingInterests": [bi(1, 20), bi(2, 12), bi(3, 8, scratched=True), bi(4, 2), bi(6, 9, 2), bi(7, 5, runner_ids=["7", "7A"])],
+        "probables": [{"minWagerAmount": 2, "wagerType": {"id": 110, "name": "Exacta"},
+                       "betCombos": [{"runner1": "4", "runner2": "6", "payout": 18.4}]},
+                      {"minWagerAmount": 1, "wagerType": {"id": 160, "name": "Daily Double"},
+                       "betCombos": [{"runner1": "4", "runner2": "1", "payout": 9.0}]}],
+    }}}
+
+
+def test_tvg_parse():
+    from totebot.sources.tvg import parse_race
+
+    snap = parse_race(tvg_payload(mtp=0))
+    assert snap.win_odds == {"1": 21.0, "2": 13.0, "4": 3.0, "6": 5.5, "7": 6.0, "7A": 6.0}
+    assert snap.scratched == ["3"]
+    assert snap.exacta_probables == {"4-6": 9.2}
+    assert snap.post_time.isoformat() == "2026-10-23T18:16:00+00:00"
+
+
+def test_tvg_follows_post_drag():
+    from totebot.sources.tvg import parse_race
+
+    past_post = (utcnow() - timedelta(minutes=1)).isoformat()
+    snap = parse_race(tvg_payload(mtp=4, post=past_post))
+    assert 3.5 < (snap.post_time - utcnow()).total_seconds() / 60 <= 4.01
+    off = parse_race(tvg_payload(mtp=4, status="SK", post=past_post))
+    assert off.post_time < utcnow()
+
+
+def test_tvg_fetch_uses_track_and_race(tmp_path):
+    import httpx
+    from totebot.sources.tvg import TvgToteSource
+
+    seen = {}
+
+    def handler(request):
+        body = json.loads(request.content)
+        seen.update(body["variables"])
+        return httpx.Response(200, json=tvg_payload())
+
+    src = TvgToteSource()
+    src.client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    race = sample_race()
+    race.track, race.source_ref = "bel", None
+    snap = run(src.fetch(race))
+    assert seen["trackAbbr"] == "BEL" and seen["raceNumber"] == "5"
+    assert snap.source == "tvg" and "4" in snap.win_odds
+    run(src.aclose())
