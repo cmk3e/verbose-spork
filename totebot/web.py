@@ -218,16 +218,18 @@ def create_app(settings: Optional[Settings] = None, start_scheduler: bool = True
     def discovery():
         """Results of the last tote-source discovery run (see totebot/tools/)."""
         summary = discovery_dir / "summary.txt"
-        if not summary.exists():
-            body = "<p>No discovery run yet.</p>"
-        else:
-            shots = sorted(p.name for p in discovery_dir.glob("*.png"))
+        shots = sorted(p.name for p in discovery_dir.glob("*.png")) if discovery_dir.is_dir() else []
+        if summary.exists():
             body = (
                 '<button onclick="navigator.clipboard.writeText(document.getElementById(\'s\').innerText)'
                 '.then(()=>this.textContent=\'Copied\')">Copy summary</button>'
                 f'<pre id="s">{html.escape(summary.read_text())}</pre>'
-                + "".join(f'<h3>{n}</h3><img src="/discovery/files/{n}">' for n in shots)
             )
+        elif shots:
+            body = "<p>The last run did not finish (no summary). Screenshots it took:</p>"
+        else:
+            body = "<p>No discovery run yet.</p>"
+        body += "".join(f'<h3>{n}</h3><img src="/discovery/files/{n}">' for n in shots)
         return HTMLResponse(
             '<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Discovery</title>'
             "<style>body{font-family:-apple-system,system-ui,sans-serif;margin:16px;background:#fff;color:#111}"

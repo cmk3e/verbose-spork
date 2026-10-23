@@ -159,103 +159,108 @@ async def run(track: str, out: Path, url: Optional[str], watch_s: int, headed: b
         page.on("response", lambda r: pending.append(asyncio.create_task(on_response(r))))
         page.on("websocket", on_websocket)
 
-        say(f"AmWager discovery {datetime.now(timezone.utc):%Y-%m-%d %H:%M}Z  track={track!r}")
+        visible = ""
         try:
-            await page.goto(start_url, wait_until="domcontentloaded", timeout=45_000)
-        except Exception as e:
-            say(f"Could not load {start_url}: {e}")
-        await page.wait_for_timeout(5000)
-        await snap(page, "1-home")
-
-        say(f"Home page title: {scrub(await page.title())!r}  url: {scrub(page.url)}")
-        if login_url:
+            say(f"AmWager discovery {datetime.now(timezone.utc):%Y-%m-%d %H:%M}Z  track={track!r}")
             try:
-                await page.goto(login_url, wait_until="domcontentloaded", timeout=45_000)
-                await page.wait_for_timeout(4000)
+                await page.goto(start_url, wait_until="domcontentloaded", timeout=45_000)
             except Exception as e:
-                say(f"Could not load {login_url}: {e}")
+                say(f"Could not load {start_url}: {e}")
+            await page.wait_for_timeout(5000)
+            await snap(page, "1-home")
 
-        # Log in: find a password box in the page or any iframe, opening a login form first if needed.
-        frame, pw_box = await find_password(page)
-        if pw_box is None:
-            login_re = re.compile(r"^\s*(log\s*in|sign\s*in|login)\s*$", re.I)
-            for candidate in (
-                page.get_by_role("button", name=login_re),
-                page.get_by_role("link", name=login_re),
-                page.get_by_text(login_re),
-                page.locator("[href*=login i], [class*=login i], [id*=login i]"),
-            ):
-                opener = await first_visible(candidate)
-                if opener is None:
-                    continue
+            say(f"Home page title: {scrub(await page.title())!r}  url: {scrub(page.url)}")
+            if login_url:
                 try:
-                    await opener.click()
-                except Exception:
-                    continue
-                await page.wait_for_timeout(4000)
-                frame, pw_box = await find_password(page)
-                if pw_box is not None:
-                    break
-        if pw_box is None:
-            await snap(page, "2-no-login-form")
-            say("Login: no password field found (see 1-home.png and 2-no-login-form.png)")
-            say("Frames: " + ", ".join(scrub(f.url)[:120] for f in page.frames))
-        else:
-            if frame is not page.main_frame:
-                say(f"Login form is inside an iframe: {scrub(frame.url)[:150]}")
-            inputs = frame.locator("input:not([type=hidden]):not([type=password]):not([type=checkbox]):not([type=radio])")
-            user_box = None
-            for i in range(await inputs.count()):
-                el = inputs.nth(i)
-                if await el.is_visible():
-                    user_box = el  # last visible text-like input before submit is usually the username
-            if user_box is None:
-                say("Login: no username field found")
-            else:
-                await user_box.fill(user)
-                await pw_box.fill(pw)
-                await snap(page, "2-login-filled")
-                await pw_box.press("Enter")
-                await page.wait_for_timeout(4000)
-                if (await find_password(page))[1] is not None:
-                    submit = await first_visible(frame.locator("button[type=submit], input[type=submit]"))
-                    submit = submit or await first_visible(
-                        frame.get_by_role("button", name=re.compile(r"log\s*in|sign\s*in|submit|continue", re.I)))
-                    if submit:
-                        await submit.click()
-                await page.wait_for_timeout(8000)
-                still = (await find_password(page))[1]
-                say("Login: " + ("password field still visible, may have FAILED (see 3-after-login.png)" if still else "looks OK"))
-        await snap(page, "3-after-login")
-
-        # Open the track.
-        if url:
-            try:
-                await page.goto(url, wait_until="domcontentloaded", timeout=45_000)
-                say(f"Opened {url}")
-            except Exception as e:
-                say(f"Could not open {url}: {e}")
-        else:
-            target = await first_visible(page.get_by_text(re.compile(re.escape(track), re.I)))
-            if target is None:
-                say(f"Track: no visible text matching {track!r} (see 3-after-login.png)")
-            else:
-                try:
-                    await target.click()
-                    say(f"Track: clicked {scrub((await target.inner_text())[:80])!r}")
+                    await page.goto(login_url, wait_until="domcontentloaded", timeout=45_000)
+                    await page.wait_for_timeout(4000)
                 except Exception as e:
-                    say(f"Track: click failed: {e}")
-        await page.wait_for_timeout(8000)
-        await snap(page, "4-track")
-        say(f"Page URL: {scrub(page.url)}")
+                    say(f"Could not load {login_url}: {e}")
 
-        say(f"Watching for odds updates for {watch_s}s…")
-        await page.wait_for_timeout(watch_s * 1000)
-        await snap(page, "5-track-later")
-        try:
-            visible = scrub(await page.inner_text("body"))
-        except Exception:
-            visible = ""
+            # Log in: find a password box in the page or any iframe, opening a login form first if needed.
+            frame, pw_box = await find_password(page)
+            if pw_box is None:
+                login_re = re.compile(r"^\s*(log\s*in|sign\s*in|login)\s*$", re.I)
+                for candidate in (
+                    page.get_by_role("button", name=login_re),
+                    page.get_by_role("link", name=login_re),
+                    page.get_by_text(login_re),
+                    page.locator("[href*=login i], [class*=login i], [id*=login i]"),
+                ):
+                    opener = await first_visible(candidate)
+                    if opener is None:
+                        continue
+                    try:
+                        await opener.click()
+                    except Exception:
+                        continue
+                    await page.wait_for_timeout(4000)
+                    frame, pw_box = await find_password(page)
+                    if pw_box is not None:
+                        break
+            if pw_box is None:
+                await snap(page, "2-no-login-form")
+                say("Login: no password field found (see 1-home.png and 2-no-login-form.png)")
+                say("Frames: " + ", ".join(scrub(f.url)[:120] for f in page.frames))
+            else:
+                if frame is not page.main_frame:
+                    say(f"Login form is inside an iframe: {scrub(frame.url)[:150]}")
+                inputs = frame.locator("input:not([type=hidden]):not([type=password]):not([type=checkbox]):not([type=radio])")
+                user_box = None
+                for i in range(await inputs.count()):
+                    el = inputs.nth(i)
+                    if await el.is_visible():
+                        user_box = el  # last visible text-like input before submit is usually the username
+                if user_box is None:
+                    say("Login: no username field found")
+                else:
+                    await user_box.fill(user)
+                    await pw_box.fill(pw)
+                    await snap(page, "2-login-filled")
+                    await pw_box.press("Enter")
+                    await page.wait_for_timeout(4000)
+                    if (await find_password(page))[1] is not None:
+                        submit = await first_visible(frame.locator("button[type=submit], input[type=submit]"))
+                        submit = submit or await first_visible(
+                            frame.get_by_role("button", name=re.compile(r"log\s*in|sign\s*in|submit|continue", re.I)))
+                        if submit:
+                            await submit.click()
+                    await page.wait_for_timeout(8000)
+                    still = (await find_password(page))[1]
+                    say("Login: " + ("password field still visible, may have FAILED (see 3-after-login.png)" if still else "looks OK"))
+            await snap(page, "3-after-login")
+
+            # Open the track.
+            if url:
+                try:
+                    await page.goto(url, wait_until="domcontentloaded", timeout=45_000)
+                    say(f"Opened {url}")
+                except Exception as e:
+                    say(f"Could not open {url}: {e}")
+            else:
+                target = await first_visible(page.get_by_text(re.compile(re.escape(track), re.I)))
+                if target is None:
+                    say(f"Track: no visible text matching {track!r} (see 3-after-login.png)")
+                else:
+                    try:
+                        await target.click()
+                        say(f"Track: clicked {scrub((await target.inner_text())[:80])!r}")
+                    except Exception as e:
+                        say(f"Track: click failed: {e}")
+            await page.wait_for_timeout(8000)
+            await snap(page, "4-track")
+            say(f"Page URL: {scrub(page.url)}")
+
+            say(f"Watching for odds updates for {watch_s}s…")
+            await page.wait_for_timeout(watch_s * 1000)
+            await snap(page, "5-track-later")
+            try:
+                visible = scrub(await page.inner_text("body"))
+            except Exception:
+                visible = ""
+        except Exception as e:  # keep whatever was captured so far
+            say(f"ERROR during run: {type(e).__name__}: {scrub(str(e))[:500]}")
+            await snap(page, "9-error")
         if pending:
             await asyncio.gather(*pending, return_exceptions=True)
         await browser.close()
