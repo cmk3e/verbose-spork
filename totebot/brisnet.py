@@ -266,6 +266,13 @@ def load_pages(pages: List[str]) -> Tuple[List[dict], List[str]]:
     races = parse_pages(pages, skipped)
     found = {(r["track_name"].lower(), r["race_number"]) for r in races}
     noted = {s.split(":")[0].lower() for s in skipped}
+    for r in races:
+        nums = {int(x["program_num"]) for x in r["runners"] if x["program_num"].isdigit()}
+        gaps = sorted(set(range(1, max(nums) + 1)) - nums) if nums else []
+        if gaps:
+            skipped.append(f"{r['track_name']} R{r['race_number']}: loaded, but no PP found for "
+                           + ", ".join(f"#{g}" for g in gaps) + " (reader may have missed it; it will still be "
+                           "included from the tote)")
     for track, num in table_of_contents(pages):
         if (track.lower(), num) not in found and f"{track} r{num}".lower() not in noted:
             skipped.append(f"{track} R{num}: not a Brisnet Ultimate PP (probably Equineline)")

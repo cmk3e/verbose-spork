@@ -247,10 +247,13 @@ def parse_race(data: Dict[str, Any], source: str = "tvg") -> ToteSnapshot:
     now = utcnow()
     win_odds: Dict[str, float] = {}
     scratched = []
+    names: Dict[str, str] = {}
     for bi in race.get("bettingInterests") or []:
         dec = odds_to_decimal(bi.get("currentOdds"))
         for runner in bi.get("runners") or []:
             num = str(runner.get("runnerId") or bi.get("biNumber")).strip()
+            if runner.get("horseName"):
+                names[num] = runner["horseName"]
             if runner.get("scratched"):
                 scratched.append(num)
             elif dec is not None:
@@ -276,7 +279,7 @@ def parse_race(data: Dict[str, Any], source: str = "tvg") -> ToteSnapshot:
     if not win_odds:
         raise ToteUnavailable(f"TVG has no odds yet for this race (status {status or '?'})")
     return ToteSnapshot(taken_at=now, win_odds=win_odds, scratched=scratched,
-                        post_time=post, exacta_probables=exacta, source=source)
+                        post_time=post, exacta_probables=exacta, source=source, extras={"names": names})
 
 
 class TvgToteSource(ToteSource):
@@ -341,7 +344,7 @@ class TvgToteSource(ToteSource):
     async def fetch(self, race: Race) -> ToteSnapshot:
         track = await self.resolve_track(race)
         snap = parse_race(await self.fetch_raw(track, race.race_number))
-        snap.extras = await self.extras(race, track)
+        snap.extras = {**snap.extras, **await self.extras(race, track)}
         return snap
 
     async def extras(self, race: Race, track: str) -> Dict[str, Any]:

@@ -780,3 +780,25 @@ def test_replace_keeps_published_races(tmp_path, monkeypatch):
         assert [r["race_number"] for r in again["races"]] == [4]
         assert again["skipped"] == ["BEL R3: kept, tickets already published"]
         assert app.state.store.get(ran.id).tickets == TICKETS
+
+
+def test_horse_missing_from_card_is_included_and_flagged(tmp_path):
+    race = sample_race()
+    race.runners = [r for r in race.runners if r.program_num != "5"]       # the PP reader "missed" #5
+    snap = tote()
+    snap.extras = {"names": {"5": "Lucky Lariat"}}
+    out = run_handicap(race, snap, settings(tmp_path))
+    assert "5" in [r["program_num"] for r in out["runners"]]
+    assert out["fundamental_source"].startswith("p_fund (median")
+    assert any(n.startswith("NOT ON YOUR CARD: #5 Lucky Lariat") for n in out["notes"])
+    five = next(r for r in out["runners"] if r["program_num"] == "5")
+    assert five["stats"]["not_on_card"] == 1 and five["name"] == "Lucky Lariat"
+
+
+def test_upload_flags_program_number_gaps():
+    from totebot.brisnet import load_pages
+
+    page = BRISNET_PAGE.format(race=3, post="2:16").replace("2 Good Vintage (NA 0)Own:", "4 Good Vintage (NA 0)Own:")
+    races, skipped = load_pages([page])
+    assert skipped == ["Belmont Park R3: loaded, but no PP found for #2 (reader may have missed it; it will still be "
+                       "included from the tote)"]

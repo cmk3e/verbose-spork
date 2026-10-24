@@ -40,23 +40,40 @@ def active_runners(race: Race, snap: ToteSnapshot) -> List[Runner]:
     ]
 
 
+def tote_only_runners(race: Race, snap: ToteSnapshot) -> List[Runner]:
+    """Horses with live odds that aren't on the card (e.g. the PP reader missed them). They still
+    run, so they join the field with the field's typical numbers rather than being ignored."""
+    on_card = {r.program_num for r in race.runners}
+    names = (snap.extras or {}).get("names") or {}
+    return [
+        Runner(program_num=n, name=names.get(n, ""), style="P", qsp=0, stats={"not_on_card": 1})
+        for n in sorted(snap.win_odds, key=lambda n: (len(n), n))
+        if n not in on_card and n not in set(snap.scratched)
+    ]
+
+
 def fundamental_probabilities(engine, runners: Sequence[Runner], settings: Settings) -> Tuple[List[float], str]:
-    """Pick the best fundamental input every active runner has."""
-    if all(r.p_fund is not None for r in runners):
-        return engine.normalize([max(r.p_fund, 1e-6) for r in runners]), "p_fund"
+    """Pick the best fundamental input most of the field has. A minority without it (first-time
+    starters, horses missing from the card) get the field's median value."""
+    def with_median(label: str, values: List[Optional[float]]) -> Optional[Tuple[List[float], str]]:
+        have = [v for v in values if v is not None]
+        if not have or 2 * len(have) < len(values):
+            return None
+        fill = statistics.median(have)
+        missing = [r.program_num for r, v in zip(runners, values) if v is None]
+        note = label + (f" (median {fill:g} used for #{', #'.join(missing)})" if missing else "")
+        return [fill if v is None else v for v in values], note
+
+    if (got := with_median("p_fund", [r.p_fund for r in runners])):
+        return engine.normalize([max(v, 1e-6) for v in got[0]]), got[1]
     if settings.training_file and all(r.features for r in runners):
         model = load_logit_model(settings.engine_module, settings.training_file)
         return model.predict_proba([r.features for r in runners]), "logit_model"
-    rated = [r.rating for r in runners if r.rating is not None]
-    if rated and 2 * len(rated) >= len(runners):
-        # A few unrated runners (e.g. first-time starters) get the field's median rating.
-        fill = statistics.median(rated)
-        missing = [r.program_num for r in runners if r.rating is None]
-        ratings = [fill if r.rating is None else r.rating for r in runners]
-        source = "rating" + (f" (median {fill:g} used for #{', #'.join(missing)})" if missing else "")
-        return engine.softmax([x / settings.rating_scale for x in ratings]), source
-    if all(r.ml_odds for r in runners):
-        return engine.normalize([1.0 / parse_odds(r.ml_odds) for r in runners]), "morning_line"
+    if (got := with_median("rating", [r.rating for r in runners])):
+        return engine.softmax([x / settings.rating_scale for x in got[0]]), got[1]
+    implied = [1.0 / parse_odds(r.ml_odds) if r.ml_odds else None for r in runners]
+    if (got := with_median("morning_line", implied)):
+        return engine.normalize(got[0]), got[1]
     raise HandicapError(
         "Every active runner needs p_fund, rating, features (with TRAINING_FILE) or ml_odds"
     )
@@ -114,12 +131,17 @@ def _floor_to(x: float, step: float) -> float:
 
 def run_handicap(race: Race, snap: ToteSnapshot, settings: Settings) -> dict:
     engine = load_engine(settings.engine_module)
+    notes: List[str] = []
     runners = active_runners(race, snap)
+    extra = tote_only_runners(race, snap)
+    if extra:
+        runners += extra
+        notes.append("NOT ON YOUR CARD: " + ", ".join(f"#{r.program_num} {r.name}".strip() for r in extra)
+                     + " (running per the tote; included with the field's median numbers, check the PP upload)")
     if len(runners) < 2:
         raise HandicapError(f"Only {len(runners)} active runner(s) with tote odds")
     nums = [r.program_num for r in runners]
     odds = [snap.win_odds[n] for n in nums]
-    notes: List[str] = []
 
     missing = [r.program_num for r in race.runners
                if not r.scratched and r.program_num not in snap.scratched and r.program_num not in snap.win_odds]
