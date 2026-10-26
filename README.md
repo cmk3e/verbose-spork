@@ -72,6 +72,10 @@ To load a whole day in one file (see `examples/day_card.csv`), add `track,race_n
 
 Fundamentals are taken in this order: `p_fund` → `features` + trained model → `rating` → `ml_odds`.
 
+## PickPony PDFs
+
+PickPony PP PDFs upload the same way as Brisnet ones (Totebot detects the format). Per horse it reads the program number, name, style + Quirin points, morning line, Prime Power to two decimals (the number under the name; used as the rating), the last-3 E1/E2/LP pace averages (fed to the engine's %-early), and records the summary figures with their field ranks, records by surface and distance with pedigree ratings, jockey/trainer win %, trainer-alert ROIs, Lasix, weight, race pars and race-by-race speed figures, using the same stat names as Brisnet where the meaning matches.
+
 ## Live tote source (`TOTE_SOURCE`)
 
 | value | what it does |

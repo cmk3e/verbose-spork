@@ -25,6 +25,7 @@ TRACK_CODES = {
     "colonial downs": "CNL", "indiana grand": "IND", "horseshoe indianapolis": "IND",
     "turfway park": "TP", "golden gate fields": "GG", "los alamitos": "LA", "remington park": "RP",
     "lone star park": "LS", "arlington park": "AP", "canterbury park": "CBY", "delaware park": "DEL",
+    "finger lakes": "FL", "finger lakes racetrack": "FL",
 }
 RACE_TYPES = {"alw", "mdn", "md", "mc", "clm", "oc", "stk", "hcp", "str", "msw", "moc", "aoc", "soc", "mcl", "wcl",
               "s", "g1", "g2", "g3", "spwt", "mdspwt", "mdsp", "mcl", "trl", "fut", "dby", "oaks"}
@@ -259,6 +260,19 @@ def parse_pdf(data: bytes) -> List[dict]:
     return parse_pages(pdf_pages(data))
 
 
+def gap_warnings(races: List[dict]) -> List[str]:
+    """Races whose program numbers skip a number: a PP the reader probably missed."""
+    out = []
+    for r in races:
+        nums = {int(x["program_num"]) for x in r["runners"] if x["program_num"].isdigit()}
+        gaps = sorted(set(range(1, max(nums) + 1)) - nums) if nums else []
+        if gaps:
+            out.append(f"{r['track_name']} R{r['race_number']}: loaded, but no PP found for "
+                       + ", ".join(f"#{g}" for g in gaps) + " (reader may have missed it; it will still be "
+                       "included from the tote)")
+    return out
+
+
 def load_pages(pages: List[str]) -> Tuple[List[dict], List[str]]:
     """(usable races, notes on races left out). Races on the cover page that aren't Brisnet
     Ultimate PPs (e.g. Equineline PPs) are reported as skipped."""
@@ -266,13 +280,7 @@ def load_pages(pages: List[str]) -> Tuple[List[dict], List[str]]:
     races = parse_pages(pages, skipped)
     found = {(r["track_name"].lower(), r["race_number"]) for r in races}
     noted = {s.split(":")[0].lower() for s in skipped}
-    for r in races:
-        nums = {int(x["program_num"]) for x in r["runners"] if x["program_num"].isdigit()}
-        gaps = sorted(set(range(1, max(nums) + 1)) - nums) if nums else []
-        if gaps:
-            skipped.append(f"{r['track_name']} R{r['race_number']}: loaded, but no PP found for "
-                           + ", ".join(f"#{g}" for g in gaps) + " (reader may have missed it; it will still be "
-                           "included from the tote)")
+    skipped += gap_warnings(races)
     for track, num in table_of_contents(pages):
         if (track.lower(), num) not in found and f"{track} r{num}".lower() not in noted:
             skipped.append(f"{track} R{num}: not a Brisnet Ultimate PP (probably Equineline)")

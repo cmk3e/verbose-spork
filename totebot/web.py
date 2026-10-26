@@ -17,7 +17,7 @@ from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 
-from . import brisnet, performance, performance_page
+from . import brisnet, performance, performance_page, pickpony
 from .cards import CardError, parse_post_time, races_from_csv, races_from_json
 from .config import Settings, get_settings
 from .handicap import load_engine
@@ -142,7 +142,8 @@ def create_app(settings: Optional[Settings] = None, start_scheduler: bool = True
             if data[:5] == b"%PDF-":
                 pages = await asyncio.to_thread(brisnet.pdf_pages, data)  # big PDFs take a while
                 try:
-                    parsed, skipped = brisnet.load_pages(pages)
+                    reader = pickpony if pickpony.detect(pages) else brisnet
+                    parsed, skipped = reader.load_pages(pages)
                     races = races_from_json(parsed, settings.timezone)
                 except (CardError, ValueError) as e:
                     upload_dir.mkdir(parents=True, exist_ok=True)

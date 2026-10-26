@@ -802,3 +802,111 @@ def test_upload_flags_program_number_gaps():
     races, skipped = load_pages([page])
     assert skipped == ["Belmont Park R3: loaded, but no PP found for #2 (reader may have missed it; it will still be "
                        "included from the tote)"]
+
+
+# --- PickPony PDFs ----------------------------------------------------------
+
+PICKPONY_P1 = """PickPony PPs Finger Lakes Racetrack Race 1 6 Furlongs Dirt Clm 7500b Claiming Purse: $16200 Claim price: $7500 (68.20) October 26, 2026 (Mon) (12:55)/11:55/10:55/9:55
+1
+EXACTA * TRIFECTA * SUPERFECTA (10 CENT MINIMUM)
+Pars: 91 91/79 Spd: 77
+Post times: (12:55)/11:55/10:55/9:55
+1
+5/1
+FIRST HORSE
+108.25
+Style: E/P3 Weight: 124
+Dark Green; White Star
+Trainer: Smith A
+Meds: Lasix
+Avg Speed: 68 (4/6)
+Speed Lst 3: 66 (5/6)
+Best Spd Dirt: 89 (4/6)
+Prime Power: 108 (4/6)
+E1 Pace Avg: 87 (3/6)
+E2 Pace Avg: 86 (3/6)
+LP Pace Avg: 67 (5/6)
+PPP Rating [A]: 36
+E1 Pace Lst 3: 85 (4/6)
+E2 Pace Lst 3: 85 (3/6)
+LP Pace Lst 3: 66 (5/6)
+Days Snce Lst: 72 (2/6)
+Trnr/Jcky ROI: 0.12 (2/2)
+Rec S W P S % Earn Bst
+Life: 21 3 5 1 43% $165,836 89
+2026: 6 1 2 1 67% $50,460 81
+Cond S W P S % Earn Bst Ped
+Fast: 10 2 4 0 60% $104,818 89 100
+Dist: 4 1 0 0 25% $37,855 89 101
+Turf: 6 1 1 0 33% $45,513 79 104
+Jockey S W P S % ROI
+2026: 101 17 14 18 49% -0.44
+Sprints: 68 12 7 9 41%
+Trainer S W P S % ROI
+2026: 296 55 46 40 48% -0.27
+Trainer Alert Starts Win% ITM ROI
+46-90daysAway: 177 17% 47% -0.67
+Claiming: 585 19% 51% -0.35
+Date Trk Dist S Rst Race Type T1 T2 T3 T4 E1 E2 LP 1c 2c Spd Pos St C1 C2 Str Fin Jockey Equ Odds Finishers Comments
+26Aug15 SAR 1m D 3+mf fsAlw105000n1x :24 :48 1:12 1:38 83 81 47 -2 -5 51/84 5 4 4 7 7 7 CarmouK Lb 6.77 X Y Z faltered
+26Jul20 FL 6f D 3+mf fsAlw24500n1x :22 :46 :59 1:12 84 83 73 5 2 67/80 6 7 6 7 7 6 WorrieA Lb 7.59 X Y Z outrun
+26Mar21 AQU 7f D 4+mf fsAlw74690n1x :23 :47 1:12 1:25 88 90 79 -5 -6 81/85 3 2 1 1 2 2 CivacisS Lb 1.88 X Y Z kept on
+26Oct05 FL 4f ft :49 3/17 Breezing
+2
+2/1
+SECOND HORSE
+116.04
+Style: E6 Weight: 124
+Avg Speed: 74 (2/6)
+E1 Pace Lst 3: 93 (1/6)
+E2 Pace Lst 3: 92 (1/6)
+LP Pace Lst 3: 77 (2/6)
+"""
+PICKPONY_P2 = """3
+4/1
+THIRD HORSE
+106.78
+Style: NA Weight: 124
+Avg Speed: 71 (3/6)
+Life: 0 0 0 0 0% $0
+"""
+
+
+def test_pickpony_parse():
+    from totebot.pickpony import detect, load_pages
+
+    pages = ["cover", PICKPONY_P1, PICKPONY_P2]
+    assert detect(pages)
+    races, skipped = load_pages(pages)
+    assert skipped == []
+    race = races[0]
+    assert (race["track"], race["track_name"], race["race_number"], race["surface"]) == ("FL", "Finger Lakes Racetrack", 1, "Fst")
+    assert race["post_time"] == "2026-10-26T12:55:00-04:00"
+    one, two, three = race["runners"]
+    assert (one["program_num"], one["name"], one["style"], one["qsp"], one["ml_odds"], one["rating"]) == \
+        ("1", "First Horse", "E/P", 3, "5-1", 108.25)
+    assert (one["call1_fps"], one["call2_fps"], one["final_fps"]) == (85.0, 85.0, 66.0)
+    s = one["stats"]
+    assert (s["days_off"], s["avg_speed_3"], s["avg_speed_3_rank"], s["ppp_rating"]) == (72, 66, 5, 36)
+    assert (s["life_starts"], s["life_wins"], s["life_best_speed"]) == (21, 3, 89)
+    assert (s["surface_starts"], s["surface_wins"], s["surface_best_speed"], s["surface_pedigree"]) == (10, 2, 89, 100)
+    assert (s["dist_starts"], s["dist_pedigree"]) == (4, 101)
+    assert (s["jockey_win_pct"], s["trainer_win_pct"]) == (17, 19)
+    assert (s["trainer_alerts"], s["trainer_alert_best_roi"], s["trainer_alert_worst_roi"]) == (2, -0.35, -0.67)
+    assert (s["last_speed"], s["best_speed_3"], s["races_with_figs"]) == (51, 81, 3)   # the workout isn't a race
+    assert s["lasix"] == 1 and s["par_speed"] == 77 and s["speed_vs_par"] == 4 and s["turf"] == 0
+    assert (two["style"], two["qsp"], two["call1_fps"]) == ("E", 6, 93.0)
+    assert (three["program_num"], three["style"], three["brisnet_style"], three["qsp"]) == ("3", "P", "NA", 0)
+    assert "call1_fps" not in three
+
+
+def test_pickpony_upload(tmp_path, monkeypatch):
+    from totebot import brisnet
+
+    monkeypatch.setattr(brisnet, "pdf_pages", lambda data: [PICKPONY_P1, PICKPONY_P2])
+    app = create_app(settings(tmp_path, password="pw"), start_scheduler=False)
+    with TestClient(app) as c:
+        c.auth = ("admin", "pw")
+        r = c.post("/api/races/upload", files={"file": ("pp.pdf", b"%PDF-1.4", "application/pdf")}).json()
+        assert [x["id"] for x in r["races"]] == ["FL-20261026-R1"]
+        assert len(r["races"][0]["runners"]) == 3
