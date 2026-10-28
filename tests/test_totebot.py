@@ -926,3 +926,34 @@ def test_blend_fit_cross_validation_verdicts(tmp_path):
     assert not right["recommend"] and abs(right["cv_gain"]) < 3 * right["cv_gain_se"] + 0.01
     page = render(summarize(races, TZ, engine, (0.2, 0.9)), settings(tmp_path))
     assert "Adopt it." in page and "Range across the 5 subsets" in page
+
+
+def test_closing_ev_buckets_and_exotic_checks(tmp_path):
+    from totebot.handicap import load_engine
+    from totebot.models import Race as R
+    from totebot.performance import closing_comparison, ev_buckets, exotic_check, settle, summarize
+    from totebot.performance_page import render
+
+    races = _simulated_races(300, alpha=1.0, beta=0.3, seed=5)
+    close = closing_comparison(races)
+    assert close["races"] == 300 and close["gain"] > 0       # the generating model beats the odds it was built from
+    buckets = ev_buckets(races)
+    assert sum(b["runners"] for b in buckets) == sum(len(r.tickets["runners"]) for r in races)
+    assert sum(b["winners"] for b in buckets) == 300
+    assert buckets[-1]["roi"] > buckets[0]["roi"]            # higher model EV -> better flat-bet ROI in this world
+
+    tickets = dict(TICKETS)
+    tickets["exotics"] = {
+        "exacta": {"base": 1.0, "cost": 2.0, "hit_probability": 0.30, "expected_return": 6.0,
+                   "combos": [{"combo": ["4", "6"], "p_model": 0.2, "est_payout_per_$1": 20.0},
+                              {"combo": ["6", "4"], "p_model": 0.1, "est_payout_per_$1": 25.0}]}}
+    race = R(id="X-1", track="X", race_number=1, post_time=utcnow(), runners=[], status="published",
+             tickets=tickets, result=RESULT, settlement=settle(tickets, RESULT), result_status="official")
+    ex = exotic_check([race])["exacta"]
+    assert (ex["tickets"], ex["races_hit"], ex["combo_hits"]) == (1, 1, 1)
+    assert ex["expected_combo_hits"] == pytest.approx(0.3) and ex["predicted_roi"] == pytest.approx(2.0)
+    assert ex["actual_roi"] == pytest.approx(18.5 / 2.0 - 1)
+
+    page = render(summarize(races + [race], TZ, load_engine("horseplay_betting_engine_v3")), settings(tmp_path))
+    for text in ("The stricter test: final odds", "Do higher-EV horses do better?", "Exotic tickets: forecast vs what happened"):
+        assert text in page

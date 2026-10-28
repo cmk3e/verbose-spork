@@ -56,6 +56,23 @@ def render(summary: Dict[str, Any], settings: Settings) -> str:
         if any(t["estimated"] for t in summary["by_type"].values()):
             parts.append('<p class="muted">* some winning payouts weren\'t reported, so estimates were used.</p>')
 
+        exo = summary.get("exotic_check") or {}
+        if exo:
+            rows = []
+            for kind, e in sorted(exo.items()):
+                rows.append([escape(kind), str(e["tickets"]), _pct(e["predicted_hit_rate"]), _pct(e["actual_hit_rate"]),
+                             f'{e["expected_combo_hits"]:.1f}', str(e["combo_hits"]),
+                             _pct(e["predicted_roi"], True), f'<span class="{_cls(e["actual_roi"])}">{_pct(e["actual_roi"], True)}</span>'])
+            over = [k for k, e in exo.items() if e["combo_hits"] < 0.7 * e["expected_combo_hits"]]
+            parts.append(
+                "<h3>Exotic tickets: forecast vs what happened</h3>"
+                '<p class="muted">What each ticket expected when it was built, against the results. '
+                "Far fewer hits than expected means the exotic probabilities are overconfident.</p>"
+                + _table(["Type", "Tickets", "Predicted hit %", "Actual hit %", "Expected winning combos",
+                          "Winning combos", "Predicted ROI", "Actual ROI"], rows)
+                + (f'<p class="neg">{", ".join(over).capitalize()}: well under the expected number of hits, so '
+                   "these tickets' probabilities are overconfident.</p>" if over else ""))
+
         ll = summary["log_loss"]
         verdict = ""
         if ll["p_true"] is not None and ll["p_public"] is not None:
@@ -75,6 +92,26 @@ def render(summary: Dict[str, Any], settings: Settings) -> str:
                 ["Your fundamentals only", f'{ll["p_fund"]:.4f}' if ll["p_fund"] is not None else "–"],
             ]) + verdict)
 
+        close = summary.get("closing")
+        if close:
+            beats = close["gain"] > 2 * close["gain_se"]
+            loses = close["gain"] < -2 * close["gain_se"]
+            note = ("The model beats even the closing odds, clearly more than noise: a real sign of edge."
+                    if beats else "The closing odds are clearly more accurate than the model: the late money knows "
+                    "more than the model does." if loses else
+                    "Against the closing odds the difference is within noise: no proven edge yet.")
+            parts.append(
+                "<h3>The stricter test: final odds</h3>"
+                '<p class="muted">The final odds include the late money, which is usually the sharpest. '
+                "Beating these is much harder than beating the odds at the pull.</p>"
+                + _table(["On the same races", "Log loss"], [
+                    [f"Model ({close['races']} races)", f"{close['model']:.4f}"],
+                    ["Public, final odds", f"{close['final']:.4f}"],
+                    ["Model better by (per race)",
+                     f'<span class="{_cls(close["gain"])}">{close["gain"]:+.4f}</span> ± {close["gain_se"]:.4f}'],
+                ])
+                + f'<p class="{"pos" if beats else "neg" if loses else "warn"}">{note}</p>')
+
         clv = summary["clv"]
         parts.append(
             "<h2>Closing-line value</h2>"
@@ -86,6 +123,16 @@ def render(summary: Dict[str, Any], settings: Settings) -> str:
                 ["All overlays (EV > 0)", str(clv["overlays"]),
                  f'<span class="{_cls(clv["overlay_clv"])}">{_pct(clv["overlay_clv"], True)}</span>'],
             ]))
+
+        buckets = summary.get("ev_buckets") or []
+        if buckets:
+            parts.append(
+                "<h2>Do higher-EV horses do better?</h2>"
+                '<p class="muted">A flat $1 win bet on every horse, grouped by the EV the model gave it at the pull. '
+                "If the EV numbers mean something, ROI should rise as you go down the table.</p>"
+                + _table(["Model EV", "Horses", "Winners", "Predicted win %", "Actual win %", "Flat $1 ROI"], [
+                    [b["range"], str(b["runners"]), str(b["winners"]), _pct(b["predicted"]), _pct(b["actual"]),
+                     f'<span class="{_cls(b["roi"])}">{_pct(b["roi"], True)}</span>'] for b in buckets]))
 
         def cal_rows(rows):
             return [[r["range"], str(r["runners"]), _pct(r["predicted"]), _pct(r["actual"])] for r in rows]

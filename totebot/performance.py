@@ -128,6 +128,94 @@ def _log_loss(races: Sequence[Race], key: str) -> Optional[float]:
     return sum(losses) / len(losses) if losses else None
 
 
+def _final_probs(race: Race) -> Dict[str, float]:
+    """The public's probabilities from the final (closing) odds, over the runners in the ticket."""
+    final = race.result.get("final_odds") or {}
+    inv = {r["program_num"]: 1.0 / final[r["program_num"]]
+           for r in race.tickets.get("runners") or [] if final.get(r["program_num"])}
+    total = sum(inv.values())
+    return {n: v / total for n, v in inv.items()} if total else {}
+
+
+def closing_comparison(races: Sequence[Race]) -> Optional[Dict[str, Any]]:
+    """Model vs the final odds, on the races where the final odds are known. The closing odds
+    include the late (often sharpest) money, so this is the stricter test of an edge."""
+    model, final, diffs = [], [], []
+    for race in races:
+        winner = race.result["finish"][0]
+        probs = _final_probs(race)
+        row = next((r for r in race.tickets.get("runners") or [] if r["program_num"] == winner), None)
+        if winner not in probs or row is None:
+            continue
+        m, f = -math.log(max(row["p_true"], 1e-6)), -math.log(max(probs[winner], 1e-6))
+        model.append(m)
+        final.append(f)
+        diffs.append(f - m)
+    if len(diffs) < 2:
+        return None
+    gain = sum(diffs) / len(diffs)
+    se = math.sqrt(sum((d - gain) ** 2 for d in diffs) / (len(diffs) - 1) / len(diffs))
+    return {"races": len(diffs), "model": sum(model) / len(model), "final": sum(final) / len(final),
+            "gain": gain, "gain_se": se}
+
+
+EV_BUCKETS = [(-math.inf, -0.25, "below −25%"), (-0.25, 0.0, "−25% to 0"), (0.0, 0.10, "0 to +10%"),
+              (0.10, 0.25, "+10% to +25%"), (0.25, 0.50, "+25% to +50%"), (0.50, math.inf, "above +50%")]
+
+
+def ev_buckets(races: Sequence[Race]) -> List[Dict[str, Any]]:
+    """A flat $1 win bet on every runner, grouped by the model's EV at the pull. If the EV numbers
+    mean anything, ROI should climb from the bottom group to the top."""
+    groups: Dict[str, Dict[str, float]] = {label: {"runners": 0, "winners": 0, "p": 0.0, "return": 0.0}
+                                           for _, _, label in EV_BUCKETS}
+    for race in races:
+        winner = race.result["finish"][0]
+        win_pay = (race.result.get("payoffs") or {}).get("win") or {}
+        final = race.result.get("final_odds") or {}
+        for r in race.tickets.get("runners") or []:
+            label = next(lbl for lo, hi, lbl in EV_BUCKETS if lo <= r["ev"] < hi)
+            g = groups[label]
+            g["runners"] += 1
+            g["p"] += r["p_true"]
+            if r["program_num"] == winner:
+                g["winners"] += 1
+                g["return"] += win_pay.get(winner) or final.get(winner) or r["odds"]
+    out = []
+    for _, _, label in EV_BUCKETS:
+        g = groups[label]
+        if g["runners"]:
+            out.append({"range": label, "runners": g["runners"], "winners": g["winners"],
+                        "predicted": g["p"] / g["runners"], "actual": g["winners"] / g["runners"],
+                        "roi": g["return"] / g["runners"] - 1})
+    return out
+
+
+def exotic_check(races: Sequence[Race]) -> Dict[str, Dict[str, Any]]:
+    """How the exotic tickets' own forecasts compared with what happened."""
+    out: Dict[str, Dict[str, Any]] = {}
+    for race in races:
+        for kind, t in (race.tickets.get("exotics") or {}).items():
+            if not t.get("combos"):
+                continue
+            hit = (race.settlement["by_type"].get(kind) or {}).get("hits", 0)
+            agg = out.setdefault(kind, {"tickets": 0, "pred_hit": 0.0, "races_hit": 0, "expected_combo_hits": 0.0,
+                                        "combo_hits": 0, "cost": 0.0, "expected_return": 0.0, "return": 0.0})
+            agg["tickets"] += 1
+            agg["pred_hit"] += t.get("hit_probability", 0.0)
+            agg["races_hit"] += int(hit > 0)
+            agg["expected_combo_hits"] += sum(c.get("p_model", 0.0) for c in t["combos"])
+            agg["combo_hits"] += hit
+            agg["cost"] += t.get("cost", 0.0)
+            agg["expected_return"] += t.get("expected_return", 0.0)  # engine's dollars, at the ticket's base
+            agg["return"] += (race.settlement["by_type"].get(kind) or {}).get("return", 0.0)
+    for agg in out.values():
+        n, cost = agg["tickets"], agg["cost"]
+        agg.update(predicted_hit_rate=agg["pred_hit"] / n, actual_hit_rate=agg["races_hit"] / n,
+                   predicted_roi=agg["expected_return"] / cost - 1 if cost else None,
+                   actual_roi=agg["return"] / cost - 1 if cost else None)
+    return out
+
+
 def _calibration(rows: Sequence[dict], key: str) -> List[Dict[str, Any]]:
     out = []
     for lo, hi in zip(CALIBRATION_BINS, CALIBRATION_BINS[1:]):
@@ -233,5 +321,8 @@ def summarize(races: Sequence[Race], tz_name: str, engine=None, current_blend: t
         "log_loss": log_loss,
         "calibration": {"model": _calibration(rows, "p_true"), "public": _calibration(rows, "p_public")},
         "blend_fit": blend,
+        "closing": closing_comparison(settled),
+        "ev_buckets": ev_buckets(settled),
+        "exotic_check": exotic_check(settled),
         "min_races_for_fit": MIN_RACES_FOR_FIT,
     }
