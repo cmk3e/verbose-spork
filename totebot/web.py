@@ -17,7 +17,7 @@ from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 
-from . import brisnet, performance, performance_page, pickpony
+from . import brisnet, candidate, performance, performance_page, pickpony
 from .cards import CardError, parse_post_time, races_from_csv, races_from_json
 from .config import Settings, get_settings
 from .handicap import load_engine
@@ -272,6 +272,7 @@ def create_app(settings: Optional[Settings] = None, start_scheduler: bool = True
     def performance_html():
         summary = performance.summarize(store.all(), settings.timezone, load_engine(settings.engine_module),
                                       (settings.alpha, settings.beta))
+        summary["candidate"] = candidate.load(settings.data_dir)
         return HTMLResponse(performance_page.render(summary, settings))
 
     @app.get("/api/performance/history.csv", dependencies=[Depends(auth)])

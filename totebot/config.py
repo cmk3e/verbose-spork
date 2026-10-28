@@ -49,6 +49,7 @@ class Settings:
     min_win_bet: float = 2.0
     max_pool_share: float = 0.02         # cap each win bet at this share of the win pool
     surface_change_action: str = "flag"  # flag | skip (no bets) when a race comes off the turf
+    candidate_model: str = "off"         # on: tickets use the fitted candidate model instead of the blend
 
     # Exotics
     exacta_base: float = 1.0
@@ -107,6 +108,7 @@ class Settings:
             min_win_bet=_float("MIN_WIN_BET", 2.0),
             max_pool_share=_float("MAX_POOL_SHARE", 0.02),
             surface_change_action=_env("SURFACE_CHANGE_ACTION", "flag").lower(),
+            candidate_model=_env("CANDIDATE_MODEL", "off").lower(),
             exacta_base=_float("EXACTA_BASE", 1.0),
             exacta_budget=_float("EXACTA_BUDGET", 20.0),
             superfecta_base=_float("SUPERFECTA_BASE", 0.10),

@@ -28,6 +28,45 @@ def _table(head: List[str], rows: List[List[str]]) -> str:
     return f'<div class="wrap"><table><thead><tr>{th}</tr></thead><tbody>{body}</tbody></table></div>'
 
 
+def _candidate_section(rep: Optional[Dict[str, Any]], settings: Settings) -> str:
+    head = ("<h2>Candidate model</h2>"
+            '<p class="muted">Benter\'s full method on everything Totebot records: the odds at the pull plus speed, pace, '
+            "layoff, records, jockey/trainer and odds-movement numbers, fitted by your engine's ConditionalLogitModel. "
+            "Refitted in the background as results come in, and judged only on races it didn't see while fitting.</p>")
+    status = f"<p>Tickets currently use: <b>{'the candidate model' if settings.candidate_model == 'on' else 'the standard blend'}</b>.</p>"
+    if not rep:
+        return head + '<p class="muted">Not fitted yet: the first fit runs a few minutes after results come in.</p>' + status
+    n, need = rep["races"], rep["min_races"]
+    progress = f"<p>Races with the extra data: <b>{n}</b> of the {need} needed. Last fitted {escape(rep['fitted_at'][:16].replace('T', ' '))} UTC.</p>"
+    if "weights" not in rep:
+        return head + progress + '<p class="muted">Too few races to show anything yet.</p>' + status
+
+    def gain(g, se):
+        return f'<span class="{_cls(g)}">{g:+.4f}</span> ± {se:.4f}' if g is not None else "–"
+
+    tests = _table(["On races it didn't see", "Value"], [
+        ["Candidate log loss", f"{rep['log_loss']:.4f}"],
+        ["Better than the current model by (per race)", gain(rep["gain_vs_current"], rep["gain_vs_current_se"])],
+        [f"Better than the final odds by (per race, {rep['races_with_final']} races)", gain(rep["gain_vs_final"], rep["gain_vs_final_se"])],
+    ])
+    weights = sorted(rep["weights"], key=lambda w: -abs(w["weight"]))
+    wtable = _table(["Input", "Weight"], [[escape(w["feature"]), f'<span class="{_cls(w["weight"])}">{w["weight"]:+.3f}</span>']
+                                          for w in weights])
+    verdicts = {
+        "ready": ('pos', "<b>Ready.</b> On races it never saw, it beats both the current model and the final odds. "
+                  "Switch tickets to it with <code>CANDIDATE_MODEL=on</code> in /etc/totebot.env, then restart."),
+        "not enough data": ('warn', f"<b>Not enough data yet.</b> Numbers above are a preview; wait for {need} races before acting on them."),
+        "doesn't beat the final odds": ('neg', "<b>Doesn't beat the final odds.</b> These inputs don't yet contain an edge over "
+                                        "the closing market. Keep the standard blend."),
+        "doesn't beat the current model": ('warn', "<b>Doesn't beat the current model.</b> No reason to switch."),
+    }
+    cls, text = verdicts.get(rep["verdict"], ("muted", escape(rep["verdict"])))
+    return (head + progress + tests
+            + '<h3>What it learned</h3><p class="muted">Weight per standard deviation of each input: positive means more '
+              "of it makes a horse more likely to win, after accounting for everything else. Near zero means it adds nothing.</p>"
+            + wtable + f'<p class="{cls}">{text}</p>' + status)
+
+
 def render(summary: Dict[str, Any], settings: Settings) -> str:
     n = summary["races"]
     pending = summary["races_pending"]
@@ -210,6 +249,7 @@ def render(summary: Dict[str, Any], settings: Settings) -> str:
             parts.append(f'<h2>Fitted blend</h2><p class="muted">Needs {summary["min_races_for_fit"]} settled races '
                          f"(have {n}). Then this suggests BLEND_ALPHA / BLEND_BETA fitted to your results.</p>")
 
+    parts.append(_candidate_section(summary.get("candidate"), settings))
     body = "\n".join(parts)
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">

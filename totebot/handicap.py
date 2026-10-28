@@ -7,6 +7,7 @@ import statistics
 from functools import lru_cache
 from typing import Dict, List, Optional, Sequence, Tuple
 
+from . import candidate
 from .config import Settings
 from .models import Race, Runner, ToteSnapshot, utcnow
 from .odds import format_odds, parse_odds
@@ -183,11 +184,26 @@ def run_handicap(race: Race, snap: ToteSnapshot, settings: Settings) -> dict:
     win_pool = (extras.get("pools") or {}).get("win")
     stake_cap = math.floor(win_pool * settings.max_pool_share) if win_pool and settings.max_pool_share > 0 else None
 
+    # Everything known about each runner, recorded for fitting (and used by the candidate model).
+    runner_stats = [{**(r.stats or {}), **tvg_runner.get(r.program_num, {}), **odds_features(race, snap, r.program_num)}
+                    for r in runners]
+
     blender = engine.BenterProbabilityBlender(
         alpha=settings.alpha, beta=settings.beta, odds_format="decimal"
     )
     p_pub = blender.public_probabilities(odds)
     p_true = blender.blend(p_paced, p_pub)
+    model_used = "blend"
+    if settings.candidate_model == "on":
+        report = candidate.load(settings.data_dir)
+        rows = [{"p_public": p_pub[i], "p_fund": p_fund[i], "pace_mod": pace_mods[i], "stats": runner_stats[i]}
+                for i in range(len(runners))]
+        probs = candidate.predict(report, engine, rows) if report else None
+        if probs:
+            p_true, model_used = probs, "candidate"
+            notes.append(f"Candidate model (fitted on {report.get('races')} races; verdict: {report.get('verdict')})")
+        else:
+            notes.append("CANDIDATE_MODEL=on but no usable fit yet; used the standard blend")
 
     kelly = engine.KellyBankrollManager(
         bankroll=settings.bankroll,
@@ -201,7 +217,6 @@ def run_handicap(race: Race, snap: ToteSnapshot, settings: Settings) -> dict:
     ])
     groups = engine.categorize_runners(evaluated)
 
-    by_num = {r.program_num: r for r in runners}
     table = []
     win_bets = []
     capped = []
@@ -221,8 +236,7 @@ def run_handicap(race: Race, snap: ToteSnapshot, settings: Settings) -> dict:
             "recommended_stake": round(ev["recommended_stake"], 2),
             "pct_early": round(pct_early[i], 2) if pct_early[i] is not None else None,
             # Everything known about the runner, recorded for fitting the model later.
-            "stats": {**(by_num[ev["program_num"]].stats or {}), **tvg_runner.get(ev["program_num"], {}),
-                      **odds_features(race, snap, ev["program_num"])},
+            "stats": runner_stats[i],
         }
         table.append(row)
         stake = _floor_to(ev["recommended_stake"], 1.0)
@@ -274,6 +288,7 @@ def run_handicap(race: Race, snap: ToteSnapshot, settings: Settings) -> dict:
         "tote_taken_at": snap.taken_at.isoformat(),
         "tote_source": snap.source,
         "fundamental_source": fund_source,
+        "model": model_used,
         "field_size": len(runners),
         "overround": round(blender.last_overround or 0.0, 4),
         "pace": pace,

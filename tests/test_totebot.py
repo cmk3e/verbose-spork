@@ -1023,3 +1023,71 @@ def test_drift_by_mtp(tmp_path):
     assert rows[1]["overlay_shrink"] == pytest.approx(1 - 7 / 9, abs=1e-3)
     assert rows[3]["winner_shrink"] == pytest.approx(0.5) and rows[3]["overlay_winners"] == 1   # #4 won: 4 -> 2
     assert rows[0]["overlays"] == 2 and rows[0]["overlay_shrink"] < rows[1]["overlay_shrink"]
+
+
+# --- candidate model ------------------------------------------------------------
+
+def _candidate_world(n, final_knows, seed=3):
+    """Races where a speed figure carries real information the odds at the pull don't have.
+    final_knows: whether the closing odds have caught up with it (late smart money)."""
+    import math as m
+    import random
+    from totebot.models import Race as R
+    from totebot.performance import settle
+
+    rng = random.Random(seed)
+    races = []
+    for i in range(n):
+        k = rng.randint(6, 9)
+        pub = [rng.random() ** 2 + 0.03 for _ in range(k)]
+        pub = [x / sum(pub) for x in pub]
+        speed = [rng.gauss(80, 8) for _ in range(k)]
+        true = [p * m.exp(0.08 * (s - 80)) for p, s in zip(pub, speed)]
+        true = [x / sum(true) for x in true]
+        winner = rng.choices(range(k), weights=true)[0]
+        close = true if final_knows else pub
+        rows = [{"program_num": str(j + 1), "name": "", "odds": 0.83 / pub[j], "p_fund": 1 / k, "pace_mod": 0.0,
+                 "p_public": pub[j], "p_true": pub[j], "ev": 0.0,
+                 "stats": {"best_speed_3": round(speed[j]), "days_off": 30}} for j in range(k)]
+        tickets = {"win_bets": [], "exotics": {}, "runners": rows}
+        result = {"finish": [str(winner + 1)], "final_odds": {str(j + 1): 1 / close[j] for j in range(k)},
+                  "payoffs": {}, "scratched": []}
+        races.append(R(id=f"C-{i}", track="C", race_number=1, post_time=utcnow(), runners=[], status="published",
+                       tickets=tickets, result=result, settlement=settle(tickets, result), result_status="official"))
+    return races
+
+
+def test_candidate_finds_a_real_edge_and_only_then_says_ready(tmp_path):
+    from totebot.candidate import evaluate
+    from totebot.handicap import load_engine
+
+    engine = load_engine("horseplay_betting_engine_v3")
+    edge = evaluate(_candidate_world(520, final_knows=False), engine)
+    assert edge["races"] == 520 and edge["verdict"] == "ready"
+    speed = next(w for w in edge["weights"] if w["feature"] == "best speed, last 3")
+    assert speed["weight"] > 0.3                                     # it learned that speed matters
+    priced_in = evaluate(_candidate_world(520, final_knows=True), engine)
+    assert priced_in["verdict"] == "doesn't beat the final odds"     # no edge once the close knows it too
+    few = evaluate(_candidate_world(150, final_knows=False), engine)
+    assert few["verdict"] == "not enough data" and "weights" in few
+    tiny = evaluate(_candidate_world(20, final_knows=False), engine)
+    assert tiny["verdict"] == "not enough data" and "weights" not in tiny   # too few to even preview
+
+
+def test_candidate_used_on_tickets_when_switched_on(tmp_path):
+    from totebot import candidate
+    from totebot.handicap import load_engine
+    from totebot.performance_page import render
+
+    race = sample_race()
+    off = run_handicap(race, tote(), settings(tmp_path))
+    assert off["model"] == "blend"
+    on = run_handicap(race, tote(), settings(tmp_path, candidate_model="on"))
+    assert on["model"] == "blend" and any("no usable fit yet" in n for n in on["notes"])
+    report = candidate.evaluate(_candidate_world(150, final_knows=False), load_engine("horseplay_betting_engine_v3"))
+    candidate.save(report, tmp_path)
+    on = run_handicap(race, tote(), settings(tmp_path, candidate_model="on"))
+    assert on["model"] == "candidate" and any(n.startswith("Candidate model (fitted on 150 races") for n in on["notes"])
+    assert sum(r["p_true"] for r in on["runners"]) == pytest.approx(1.0, abs=1e-3)
+    page = render({"races": 0, "races_pending": 0, "candidate": candidate.load(tmp_path)}, settings(tmp_path))
+    assert "Candidate model" in page and "150</b> of the 500 needed" in page and "Not enough data yet" in page

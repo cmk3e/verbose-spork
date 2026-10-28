@@ -4,9 +4,9 @@ from collections import defaultdict
 from datetime import datetime
 from typing import Optional
 
-from . import notify
+from . import candidate, notify
 from .config import Settings
-from .handicap import run_handicap
+from .handicap import load_engine, run_handicap
 from .models import Race, ToteSnapshot, utcnow
 from .performance import settle
 from .sources import ToteSource, ToteUnavailable
@@ -21,6 +21,8 @@ RESULT_GIVE_UP_MIN = 180
 ODDS_HISTORY_MAX = 90
 TRACK_INTERVAL_S = 30   # after the pull, keep recording the odds this often...
 TRACK_UNTIL_MIN = 5     # ...until this long after post (records only; tickets don't change)
+REFIT_CHECK_S = 300     # how often to look for new results to refit the candidate model on...
+REFIT_MIN_GAP_S = 3600  # ...but refit at most this often (it takes a while)
 
 
 class RaceScheduler:
@@ -39,15 +41,37 @@ class RaceScheduler:
 
     def start(self) -> None:
         self._task = asyncio.create_task(self._loop())
+        self._refit_task = asyncio.create_task(self._refit_loop())
 
     async def stop(self) -> None:
-        if self._task:
-            self._task.cancel()
-            try:
-                await self._task
-            except asyncio.CancelledError:
-                pass
+        for task in (self._task, getattr(self, "_refit_task", None)):
+            if task:
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
         await self.source.aclose()
+
+    async def _refit_loop(self) -> None:
+        last_count, last_at = None, None
+        while True:
+            await asyncio.sleep(REFIT_CHECK_S)
+            try:
+                count = sum(1 for r in self.store.all() if r.result_status == "official")
+                due = last_at is None or (utcnow() - last_at).total_seconds() >= REFIT_MIN_GAP_S
+                if count != last_count and due:
+                    await asyncio.to_thread(self.refit_candidate)
+                    last_count, last_at = count, utcnow()
+            except Exception:
+                log.exception("Candidate model refit failed")
+
+    def refit_candidate(self) -> dict:
+        """Fit and test the candidate model on all settled races; saved for the page and for tickets."""
+        report = candidate.evaluate(self.store.all(), load_engine(self.s.engine_module))
+        candidate.save(report, self.s.data_dir)
+        log.info("Candidate model: %s races, verdict %s", report["races"], report["verdict"])
+        return report
 
     async def _loop(self) -> None:
         while True:

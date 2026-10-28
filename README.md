@@ -124,6 +124,10 @@ Used right away:
 - **Surface changes** (e.g. off the turf) put a warning at the top of the ticket. Set `SURFACE_CHANGE_ACTION=skip` to bet nothing in those races.
 - **Pool-size caps:** each win bet is capped at `MAX_POOL_SHARE` (default 2%) of the win pool so small pools don't swallow your own price.
 
+## Candidate model
+
+Benter's full method on everything Totebot records: the engine's `ConditionalLogitModel` is fitted on the public's odds at the pull plus your fundamentals, pace adjustment, speed and pace figures, days off, surface and career win rates, jockey/trainer win %, QuickPlay comments and odds movement (only things known at bet time). Totebot refits it in the background as results come in (at most hourly) and the **Candidate model** section of the Performance page shows how many races it has (500 needed), the weight it gives each input, and how it does on races it didn't see against the current model and against the **final odds**. Its verdict is `ready` only when it beats both; then set `CANDIDATE_MODEL=on` in `/etc/totebot.env` and restart to have tickets use it.
+
 ## How the timing works
 
 - Times are based on the race's post time, and the tote can update it. Starting at 15 MTP the scheduler polls the source every 60 s. If the source reports a later post time ("post drag"), the 3-minute and 2-minute marks move with it.
