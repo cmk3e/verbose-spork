@@ -114,15 +114,23 @@ def render(summary: Dict[str, Any], settings: Settings) -> str:
 
         clv = summary["clv"]
         parts.append(
-            "<h2>Closing-line value</h2>"
-            '<p class="muted">Odds when the tote was pulled vs final odds. Positive means you got a better '
-            "price than the closing odds, usually the earliest sign of a real edge.</p>"
-            + _table(["Group", "Count", "Avg CLV"], [
+            "<h2>Late odds movement</h2>"
+            '<p class="muted">How much higher the odds were at the pull than at the off. At the track every bet is '
+            "paid at the final odds, so a positive number cuts both ways: the late money (often the sharpest) "
+            "agreed with the model and bet these horses down, which is a good sign about the model, but it also "
+            "means your payouts were smaller than the odds the tickets were priced on.</p>"
+            + _table(["Group", "Count", "Odds at pull vs final"], [
                 ["Win bets placed", str(clv["win_bets"]),
                  f'<span class="{_cls(clv["win_bet_clv"])}">{_pct(clv["win_bet_clv"], True)}</span>'],
                 ["All overlays (EV > 0)", str(clv["overlays"]),
                  f'<span class="{_cls(clv["overlay_clv"])}">{_pct(clv["overlay_clv"], True)}</span>'],
-            ]))
+            ])
+            + (f'<p>Typical shrink in an overlay\'s odds before the off: <b>{clv["suggested_haircut"]:.0%}</b>. '
+               f"ODDS_HAIRCUT is set to <b>{settings.odds_haircut:.0%}</b>"
+               + (". That's too small: tickets price overlays on odds they won't get. Set "
+                  f"<b>ODDS_HAIRCUT={clv['suggested_haircut']:.2f}</b> in /etc/totebot.env.</p>"
+                  if clv["suggested_haircut"] > settings.odds_haircut + 0.03 else ", which is about right.</p>")
+               if clv.get("suggested_haircut") is not None else ""))
 
         buckets = summary.get("ev_buckets") or []
         if buckets:

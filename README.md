@@ -104,7 +104,7 @@ A few minutes after each published race goes official, Totebot pulls the result,
 
 - **Return by bet type**: cost, return, profit and ROI for win, exacta and superfecta.
 - **Is there an edge?**: log loss of the model's probabilities vs the public's on the actual winners. The model has to beat the public here to be worth betting.
-- **Closing-line value**: the odds at the 3 MTP pull vs the final odds, for your win bets and for every overlay.
+- **Late odds movement**: the odds at the 3 MTP pull vs the final odds, for your win bets and every overlay. Bets are paid at the final odds, so a drop means the late money agreed with the model but your payouts shrank; the page suggests an `ODDS_HAIRCUT` matching the typical drop.
 - **Calibration**: predicted vs actual win rates, for the model and for the public.
 - **Fitted blend**: after 100 settled races, the `BLEND_ALPHA` / `BLEND_BETA` that best fit your results (Benter's second stage, using the engine's `ConditionalLogitModel`).
 

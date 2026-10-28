@@ -957,3 +957,18 @@ def test_closing_ev_buckets_and_exotic_checks(tmp_path):
     page = render(summarize(races + [race], TZ, load_engine("horseplay_betting_engine_v3")), settings(tmp_path))
     for text in ("The stricter test: final odds", "Do higher-EV horses do better?", "Exotic tickets: forecast vs what happened"):
         assert text in page
+
+
+def test_suggested_haircut_from_late_odds_drop(tmp_path):
+    from totebot.models import Race as R
+    from totebot.performance import settle, summarize
+    from totebot.performance_page import render
+
+    result = dict(RESULT, final_odds={"4": 3.0, "6": 6.0, "8": 3.0, "1": 6.0})   # overlays #4 and #6 bet down
+    race = R(id="X-1", track="X", race_number=1, post_time=utcnow(), runners=[], status="published",
+             tickets=TICKETS, result=result, settlement=settle(TICKETS, result), result_status="official")
+    s = summarize([race], TZ)
+    # #4: 4.0 -> 3.0 shrinks odds-to-1 by 1/3; #6: 8.0 -> 6.0 by 2/7; median = 0.31
+    assert s["clv"]["suggested_haircut"] == pytest.approx((1 / 3 + 2 / 7) / 2, abs=1e-3)
+    page = render(s, settings(tmp_path))
+    assert "Typical shrink" in page and "ODDS_HAIRCUT=0.31" in page

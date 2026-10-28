@@ -3,6 +3,7 @@
 All tickets are settled as if they were bet as printed (paper trading).
 """
 import math
+import statistics
 from typing import Any, Dict, List, Optional, Sequence
 
 from .models import Race
@@ -309,6 +310,11 @@ def summarize(races: Sequence[Race], tz_name: str, engine=None, current_blend: t
         "win_bet_clv": sum(b["clv"] for b in win_bets) / len(win_bets) if win_bets else None,
         "overlays": len(overlays),
         "overlay_clv": (sum(r["odds_at_pull"] / r["odds_final"] - 1 for r in overlays) / len(overlays)) if overlays else None,
+        # Payouts use the final odds, so the engine's odds haircut should match how much an overlay's
+        # odds-to-1 shrink between the pull and the off: haircut = 1 - (final - 1) / (pull - 1), median.
+        "suggested_haircut": (round(statistics.median(1 - (r["odds_final"] - 1) / (r["odds_at_pull"] - 1)
+                                                      for r in overlays if r["odds_at_pull"] > 1), 3)
+                              if overlays else None),
     }
     log_loss = {k: _log_loss(settled, k) for k in ("p_true", "p_public", "p_paced", "p_fund")}
     blend = fit_blend(settled, engine, current_blend) if engine is not None else None
