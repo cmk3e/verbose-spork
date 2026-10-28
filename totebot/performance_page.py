@@ -125,23 +125,34 @@ def render(summary: Dict[str, Any], settings: Settings) -> str:
                 ["All overlays (EV > 0)", str(clv["overlays"]),
                  f'<span class="{_cls(clv["overlay_clv"])}">{_pct(clv["overlay_clv"], True)}</span>'],
             ])
-            + (f'<p>Typical shrink in an overlay\'s odds before the off: <b>{clv["suggested_haircut"]:.0%}</b>. '
-               f"ODDS_HAIRCUT is set to <b>{settings.odds_haircut:.0%}</b>"
-               + (". That's too small: tickets price overlays on odds they won't get. Set "
-                  f"<b>ODDS_HAIRCUT={clv['suggested_haircut']:.2f}</b> in /etc/totebot.env.</p>"
-                  if clv["suggested_haircut"] > settings.odds_haircut + 0.03 else ", which is about right.</p>")
-               if clv.get("suggested_haircut") is not None else ""))
+            + (_table(["How much overlays' odds dropped before the off", "Drop"], [
+                ["Typical (median) overlay", _pct(clv["haircut_median"])],
+                ["All overlays, pooled payout", _pct(clv["haircut_pooled"])],
+                [f"Overlays that won ({clv['overlay_winners']})",
+                 _pct(clv["haircut_winners"]) if clv["haircut_winners"] is not None else "–"],
+              ])
+              + f'<p>Suggested ODDS_HAIRCUT, from {clv["haircut_basis"]}: <b>{clv["suggested_haircut"]:.2f}</b> '
+              f"(currently {settings.odds_haircut:.2f})"
+              + (". The winners are what pay you, so this is the one to use."
+                 if clv["haircut_basis"] == "overlays that won" else
+                 f". Once {30} overlays have won, this switches to the drop on winners, which is what actually pays.")
+              + (f" Set <b>ODDS_HAIRCUT={clv['suggested_haircut']:.2f}</b> in /etc/totebot.env.</p>"
+                 if abs(clv["suggested_haircut"] - settings.odds_haircut) > 0.03 else " That's about right already.</p>")
+              if clv.get("suggested_haircut") is not None else ""))
 
         drift = summary.get("drift") or []
         if drift:
             parts.append(
                 "<h3>When to pull: how much the odds still drop</h3>"
                 '<p class="muted">For each time before post, the typical drop still to come in the odds before the off. '
-                "Pull at the latest time you can still bet, and set ODDS_HAIRCUT to that row's overlay figure. "
+                "Pull at the latest time you can still bet, and set ODDS_HAIRCUT to that row's drop on overlays that "
+                "won once it has 30+ winners (the overall overlay figure until then). "
                 "2, 1 and 0 MTP only fill in for races run since odds started being recorded every 30 seconds.</p>"
-                + _table(["Minutes to post", "Races", "Overlays", "Overlay odds drop", "All horses"], [
+                + _table(["Minutes to post", "Races", "Overlays", "Overlay odds drop", "On overlays that won",
+                          "All horses"], [
                     [f"{d['mtp']} MTP", str(d["races"]), str(d["overlays"]),
                      _pct(d["overlay_shrink"]) if d["overlay_shrink"] is not None else "–",
+                     (_pct(d["winner_shrink"]) + f" ({d['overlay_winners']})") if d["winner_shrink"] is not None else "–",
                      _pct(d["all_shrink"]) if d["all_shrink"] is not None else "–"] for d in drift]))
 
         buckets = summary.get("ev_buckets") or []

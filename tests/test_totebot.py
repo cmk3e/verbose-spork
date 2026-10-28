@@ -967,11 +967,25 @@ def test_suggested_haircut_from_late_odds_drop(tmp_path):
     result = dict(RESULT, final_odds={"4": 3.0, "6": 6.0, "8": 3.0, "1": 6.0})   # overlays #4 and #6 bet down
     race = R(id="X-1", track="X", race_number=1, post_time=utcnow(), runners=[], status="published",
              tickets=TICKETS, result=result, settlement=settle(TICKETS, result), result_status="official")
-    s = summarize([race], TZ)
-    # #4: 4.0 -> 3.0 shrinks odds-to-1 by 1/3; #6: 8.0 -> 6.0 by 2/7; median = 0.31
-    assert s["clv"]["suggested_haircut"] == pytest.approx((1 / 3 + 2 / 7) / 2, abs=1e-3)
-    page = render(s, settings(tmp_path))
-    assert "Typical shrink" in page and "ODDS_HAIRCUT=0.31" in page
+    clv = summarize([race], TZ)["clv"]
+    # #4: 4.0 -> 3.0 (odds-to-1 3 -> 2), #6: 8.0 -> 6.0 (7 -> 5); #4 won
+    assert clv["haircut_median"] == pytest.approx((1 / 3 + 2 / 7) / 2, abs=1e-3)
+    assert clv["haircut_pooled"] == pytest.approx(1 - 7 / 10, abs=1e-3)
+    assert clv["haircut_winners"] == pytest.approx(1 / 3, abs=1e-3) and clv["overlay_winners"] == 1
+    assert clv["suggested_haircut"] == clv["haircut_pooled"] and clv["haircut_basis"] == "all overlays (pooled)"
+    page = render(summarize([race], TZ), settings(tmp_path))
+    assert "ODDS_HAIRCUT=0.30" in page and "Overlays that won (1)" in page
+
+
+def test_haircut_uses_winners_once_there_are_enough():
+    from totebot.performance import haircut_estimates
+
+    losers = [{"odds_at_pull": 11.0, "odds_final": 11.0, "won": 0} for _ in range(100)]
+    winners = [{"odds_at_pull": 11.0, "odds_final": 8.0, "won": 1} for _ in range(30)]
+    h = haircut_estimates(losers + winners)
+    assert h["haircut_median"] == 0.0                     # the typical overlay doesn't move...
+    assert h["haircut_winners"] == pytest.approx(0.3)     # ...but the ones that win get bet down 30%
+    assert h["suggested_haircut"] == pytest.approx(0.3) and h["haircut_basis"] == "overlays that won"
 
 
 def test_odds_recorded_every_30s_until_the_off(tmp_path):
@@ -1004,7 +1018,8 @@ def test_drift_by_mtp(tmp_path):
              result=result, settlement=settle(TICKETS, result), result_status="official", odds_history=hist)
     rows = {d["mtp"]: d for d in drift_by_mtp([race])}
     assert set(rows) == {3, 1, 0}
-    # overlays #4 and #6: at 3 MTP 5.0->3.0 shrinks 1/2 and 9.0->6.0 shrinks 3/8; median 0.4375
-    assert rows[3]["overlay_shrink"] == pytest.approx((0.5 + 0.375) / 2)
-    assert rows[1]["overlay_shrink"] == pytest.approx((1 / 3 + 1 / 6) / 2)
+    # overlays #4 and #6, odds-to-1 pooled: at 3 MTP (4 + 8) -> (2 + 5); at 1 MTP (3 + 6) -> (2 + 5)
+    assert rows[3]["overlay_shrink"] == pytest.approx(1 - 7 / 12, abs=1e-3)
+    assert rows[1]["overlay_shrink"] == pytest.approx(1 - 7 / 9, abs=1e-3)
+    assert rows[3]["winner_shrink"] == pytest.approx(0.5) and rows[3]["overlay_winners"] == 1   # #4 won: 4 -> 2
     assert rows[0]["overlays"] == 2 and rows[0]["overlay_shrink"] < rows[1]["overlay_shrink"]

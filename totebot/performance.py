@@ -176,7 +176,7 @@ def drift_by_mtp(races: Sequence[Race]) -> List[Dict[str, Any]]:
     checkpoint you can bet at is the best pull time, and its overlay shrink is its ODDS_HAIRCUT."""
     out = []
     for cp in DRIFT_CHECKPOINTS:
-        overlays, everyone, race_count = [], [], 0
+        overlays, everyone, race_count = [], [], 0   # (odds then, final odds, won) per horse
         for race in races:
             final = race.result.get("final_odds") or {}
             polls = [(((race.post_time - datetime.fromisoformat(h["t"])).total_seconds() / 60), h["odds"])
@@ -186,22 +186,52 @@ def drift_by_mtp(races: Sequence[Race]) -> List[Dict[str, Any]]:
                 continue
             odds_then = min(near, key=lambda x: x[0])[1]
             race_count += 1
+            winner = race.result["finish"][0]
             for r in race.tickets.get("runners") or []:
                 n = r["program_num"]
                 if odds_then.get(n, 0) > 1 and final.get(n):
-                    s = _shrink(odds_then[n], final[n])
-                    everyone.append(s)
+                    row = {"odds_at_pull": odds_then[n], "odds_final": final[n], "won": int(n == winner)}
+                    everyone.append(row)
                     if r["ev"] > 0:
-                        overlays.append(s)
+                        overlays.append(row)
         if race_count:
-            out.append({"mtp": cp, "races": race_count, "overlays": len(overlays),
-                        "overlay_shrink": statistics.median(overlays) if overlays else None,
-                        "all_shrink": statistics.median(everyone) if everyone else None})
+            won = [r for r in overlays if r["won"]]
+            out.append({"mtp": cp, "races": race_count, "overlays": len(overlays), "overlay_winners": len(won),
+                        "overlay_shrink": _pooled_shrink(overlays), "winner_shrink": _pooled_shrink(won),
+                        "all_shrink": _pooled_shrink(everyone)})
     return out
 
 
 EV_BUCKETS = [(-math.inf, -0.25, "below −25%"), (-0.25, 0.0, "−25% to 0"), (0.0, 0.10, "0 to +10%"),
               (0.10, 0.25, "+10% to +25%"), (0.25, 0.50, "+25% to +50%"), (0.50, math.inf, "above +50%")]
+
+
+MIN_WINNERS_FOR_HAIRCUT = 30
+
+
+def _pooled_shrink(rows: Sequence[dict]) -> Optional[float]:
+    """1 - total final odds-to-1 / total odds-to-1 at the pull: the drop in payout, pooled."""
+    pull = sum(r["odds_at_pull"] - 1 for r in rows if r["odds_at_pull"] > 1)
+    final = sum(r["odds_final"] - 1 for r in rows if r["odds_at_pull"] > 1)
+    return round(1 - final / pull, 3) if pull > 0 else None
+
+
+def haircut_estimates(overlays: Sequence[dict]) -> Dict[str, Any]:
+    """Payouts use the final odds, so ODDS_HAIRCUT should match how much overlays' odds-to-1 shrink
+    between the pull and the off, measured where it costs money. A median across all overlays
+    hides that late money (often smart money) piles onto the horses that go on to win, so the
+    recommendation uses the pooled drop on overlays that won, once there are enough of them."""
+    rows = [r for r in overlays if r["odds_at_pull"] > 1]
+    winners = [r for r in rows if r["won"]]
+    median = round(statistics.median(1 - (r["odds_final"] - 1) / (r["odds_at_pull"] - 1) for r in rows), 3) if rows else None
+    pooled, on_winners = _pooled_shrink(rows), _pooled_shrink(winners)
+    use_winners = len(winners) >= MIN_WINNERS_FOR_HAIRCUT and on_winners is not None
+    return {
+        "haircut_median": median, "haircut_pooled": pooled, "haircut_winners": on_winners,
+        "overlay_winners": len(winners),
+        "suggested_haircut": max(0.0, on_winners if use_winners else pooled) if (use_winners or pooled is not None) else None,
+        "haircut_basis": "overlays that won" if use_winners else "all overlays (pooled)",
+    }
 
 
 def ev_buckets(races: Sequence[Race]) -> List[Dict[str, Any]]:
@@ -350,11 +380,7 @@ def summarize(races: Sequence[Race], tz_name: str, engine=None, current_blend: t
         "win_bet_clv": sum(b["clv"] for b in win_bets) / len(win_bets) if win_bets else None,
         "overlays": len(overlays),
         "overlay_clv": (sum(r["odds_at_pull"] / r["odds_final"] - 1 for r in overlays) / len(overlays)) if overlays else None,
-        # Payouts use the final odds, so the engine's odds haircut should match how much an overlay's
-        # odds-to-1 shrink between the pull and the off: haircut = 1 - (final - 1) / (pull - 1), median.
-        "suggested_haircut": (round(statistics.median(1 - (r["odds_final"] - 1) / (r["odds_at_pull"] - 1)
-                                                      for r in overlays if r["odds_at_pull"] > 1), 3)
-                              if overlays else None),
+        **haircut_estimates(overlays),
     }
     log_loss = {k: _log_loss(settled, k) for k in ("p_true", "p_public", "p_paced", "p_fund")}
     blend = fit_blend(settled, engine, current_blend) if engine is not None else None
