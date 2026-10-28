@@ -133,7 +133,12 @@ async function api(path, opts = {}) {
 }
 function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2500); }
 function fmtTime(iso) {
-  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: cfg.timezone });
+  const d = new Date(iso);
+  const day = (x) => x.toLocaleDateString("en-CA", { timeZone: cfg.timezone });
+  const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: cfg.timezone });
+  // Races from another day get their date, so an old race can't pass for today's.
+  return day(d) === day(new Date()) ? time
+    : d.toLocaleDateString([], { weekday: "short", month: "numeric", day: "numeric", timeZone: cfg.timezone }) + " " + time;
 }
 function mtpOf(r) { return (new Date(r.post_time) - Date.now()) / 60000; }
 function fmtMtp(m) {

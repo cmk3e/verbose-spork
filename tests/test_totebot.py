@@ -910,3 +910,19 @@ def test_pickpony_upload(tmp_path, monkeypatch):
         r = c.post("/api/races/upload", files={"file": ("pp.pdf", b"%PDF-1.4", "application/pdf")}).json()
         assert [x["id"] for x in r["races"]] == ["FL-20261026-R1"]
         assert len(r["races"][0]["runners"]) == 3
+
+
+def test_blend_fit_cross_validation_verdicts(tmp_path):
+    from totebot.handicap import load_engine
+    from totebot.performance import fit_blend, summarize
+    from totebot.performance_page import render
+
+    engine = load_engine("horseplay_betting_engine_v3")
+    races = _simulated_races(400, alpha=1.0, beta=0.3, seed=11)
+    wrong = fit_blend(races, engine, current=(0.2, 0.9))          # current weights far from the truth
+    assert wrong["recommend"] and wrong["cv_gain"] > 2 * wrong["cv_gain_se"]
+    assert wrong["alpha_range"][0] <= wrong["alpha"] <= wrong["alpha_range"][1]
+    right = fit_blend(races, engine, current=(1.0, 0.3))          # current weights already right
+    assert not right["recommend"] and abs(right["cv_gain"]) < 3 * right["cv_gain_se"] + 0.01
+    page = render(summarize(races, TZ, engine, (0.2, 0.9)), settings(tmp_path))
+    assert "Adopt it." in page and "Range across the 5 subsets" in page

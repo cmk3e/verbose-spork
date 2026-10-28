@@ -265,11 +265,13 @@ def create_app(settings: Optional[Settings] = None, start_scheduler: bool = True
 
     @app.get("/api/performance", dependencies=[Depends(auth)])
     def performance_json():
-        return performance.summarize(store.all(), settings.timezone, load_engine(settings.engine_module))
+        return performance.summarize(store.all(), settings.timezone, load_engine(settings.engine_module),
+                                      (settings.alpha, settings.beta))
 
     @app.get("/performance", include_in_schema=False, dependencies=[Depends(auth)])
     def performance_html():
-        summary = performance.summarize(store.all(), settings.timezone, load_engine(settings.engine_module))
+        summary = performance.summarize(store.all(), settings.timezone, load_engine(settings.engine_module),
+                                      (settings.alpha, settings.beta))
         return HTMLResponse(performance_page.render(summary, settings))
 
     @app.get("/api/performance/history.csv", dependencies=[Depends(auth)])

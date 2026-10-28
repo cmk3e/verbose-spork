@@ -98,11 +98,36 @@ def render(summary: Dict[str, Any], settings: Settings) -> str:
 
         fit = summary["blend_fit"]
         if fit:
+            cur = fit["current"]
+            if fit["recommend"]:
+                verdict = (f'<p class="pos"><b>Adopt it.</b> On races the fit never saw, the fitted weights beat the '
+                           f"current ones, and they hold steady across subsets. Set <b>BLEND_ALPHA={fit['alpha']}</b> and "
+                           f"<b>BLEND_BETA={fit['beta']}</b> in /etc/totebot.env, then restart.</p>")
+            elif not fit["stable"]:
+                verdict = ('<p class="warn"><b>Not yet.</b> The fitted weights still swing a lot depending on which races '
+                           "are used, so they aren't settled. Keep collecting races.</p>")
+            else:
+                verdict = ('<p class="warn"><b>Not yet.</b> The fitted weights don\'t clearly beat the current ones on '
+                           "unseen races; the difference is within noise. Keep the current settings for now.</p>")
+            if fit["alpha"] < 0.15:
+                verdict += ('<p class="neg">Note: the fit gives your fundamentals very little weight. On these races they '
+                            "add almost nothing beyond the tote odds, which means little real edge to bet on.</p>")
             parts.append(
                 "<h2>Fitted blend</h2>"
-                f"<p>From {fit['races']} races, the best weights are <b>BLEND_ALPHA={fit['alpha']}</b> (yours) and "
-                f"<b>BLEND_BETA={fit['beta']}</b> (public). Current settings: {settings.alpha} / {settings.beta}. "
-                "Refit after more races before relying on it; then set them in /etc/totebot.env.</p>")
+                f'<p class="muted">How much to trust your numbers (alpha) vs the public\'s (beta), fitted to {fit["races"]} '
+                "races, then checked by fitting on 4/5 of the races and testing on the other 1/5, five times over.</p>"
+                + _table(["", "BLEND_ALPHA (yours)", "BLEND_BETA (public)"], [
+                    ["Current settings", f"{cur['alpha']:g}", f"{cur['beta']:g}"],
+                    ["Fitted, all races", f"<b>{fit['alpha']:g}</b>", f"<b>{fit['beta']:g}</b>"],
+                    ["Range across the 5 subsets", f"{fit['alpha_range'][0]:g} – {fit['alpha_range'][1]:g}",
+                     f"{fit['beta_range'][0]:g} – {fit['beta_range'][1]:g}"],
+                ])
+                + _table(["Test on unseen races", "Value"], [
+                    ["Log loss with current settings", f"{fit['cv_log_loss_current']:.4f}"],
+                    ["Improvement from fitted weights (per race)",
+                     f'<span class="{_cls(fit["cv_gain"])}">{fit["cv_gain"]:+.4f}</span> ± {fit["cv_gain_se"]:.4f}'],
+                ])
+                + verdict)
         else:
             parts.append(f'<h2>Fitted blend</h2><p class="muted">Needs {summary["min_races_for_fit"]} settled races '
                          f"(have {n}). Then this suggests BLEND_ALPHA / BLEND_BETA fitted to your results.</p>")

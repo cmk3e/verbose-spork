@@ -9,6 +9,8 @@ from .models import Race
 
 CALIBRATION_BINS = [0.0, 0.05, 0.10, 0.15, 0.20, 0.30, 0.50, 1.0001]
 MIN_RACES_FOR_FIT = 100
+CV_FOLDS = 5
+MAX_FOLD_SPREAD = 0.3   # fitted weights moving more than this between folds aren't settled yet
 
 
 def settle(tickets: Dict[str, Any], result: Dict[str, Any]) -> Dict[str, Any]:
@@ -137,9 +139,8 @@ def _calibration(rows: Sequence[dict], key: str) -> List[Dict[str, Any]]:
     return out
 
 
-def fit_blend(races: Sequence[Race], engine) -> Optional[Dict[str, float]]:
-    """Benter's second stage: fit win ~ a*log(p_paced) + b*log(p_public) with the engine's
-    ConditionalLogitModel. Returns the weights in BLEND_ALPHA / BLEND_BETA units."""
+def _blend_data(races: Sequence[Race]) -> List[tuple]:
+    """Per race: ([log p_paced, log p_public] per runner, index of the winner)."""
     data = []
     for race in races:
         rows = race.tickets.get("runners") or []
@@ -150,14 +151,54 @@ def fit_blend(races: Sequence[Race], engine) -> Optional[Dict[str, float]]:
         paced = _paced(rows)
         X = [[math.log(max(p, 1e-6)), math.log(max(r["p_public"], 1e-6))] for r, p in zip(rows, paced)]
         data.append((X, nums.index(winner)))
+    return data
+
+
+def _race_log_loss(X: List[List[float]], winner: int, alpha: float, beta: float) -> float:
+    scores = [alpha * x[0] + beta * x[1] for x in X]
+    top = max(scores)
+    return -(scores[winner] - top - math.log(sum(math.exp(s - top) for s in scores)))
+
+
+def _fit_weights(engine, data: List[tuple]) -> tuple:
+    model = engine.ConditionalLogitModel(l2=0.0, epochs=400).fit(data)
+    return tuple(w / s for w, s in zip(model.weights, model.stds))  # back to raw log-probability units
+
+
+def fit_blend(races: Sequence[Race], engine, current: tuple = (0.6, 0.4)) -> Optional[Dict[str, Any]]:
+    """Benter's second stage: fit win ~ a*log(p_paced) + b*log(p_public) with the engine's
+    ConditionalLogitModel, in BLEND_ALPHA / BLEND_BETA units. Also checks it out of sample:
+    5-fold cross-validation compares the fitted weights with the current ones on races each fit
+    never saw, and reports how much the weights move between folds."""
+    data = _blend_data(races)
     if len(data) < MIN_RACES_FOR_FIT:
         return None
-    model = engine.ConditionalLogitModel(l2=0.0, epochs=400).fit(data)
-    alpha, beta = (w / s for w, s in zip(model.weights, model.stds))
-    return {"alpha": round(alpha, 3), "beta": round(beta, 3), "races": len(data)}
+    alpha, beta = _fit_weights(engine, data)
+    diffs, fold_fits = [], []
+    for k in range(CV_FOLDS):
+        train = [d for i, d in enumerate(data) if i % CV_FOLDS != k]
+        test = [d for i, d in enumerate(data) if i % CV_FOLDS == k]
+        a, b = _fit_weights(engine, train)
+        fold_fits.append((a, b))
+        diffs += [_race_log_loss(X, w, *current) - _race_log_loss(X, w, a, b) for X, w in test]
+    n = len(diffs)
+    gain = sum(diffs) / n
+    se = math.sqrt(sum((d - gain) ** 2 for d in diffs) / (n - 1) / n)
+    alphas, betas = [f[0] for f in fold_fits], [f[1] for f in fold_fits]
+    stable = max(alphas) - min(alphas) <= MAX_FOLD_SPREAD and max(betas) - min(betas) <= MAX_FOLD_SPREAD
+    return {
+        "alpha": round(alpha, 3), "beta": round(beta, 3), "races": len(data),
+        "current": {"alpha": current[0], "beta": current[1]},
+        "cv_log_loss_current": round(sum(_race_log_loss(X, w, *current) for X, w in data) / len(data), 4),
+        "cv_gain": round(gain, 4), "cv_gain_se": round(se, 4),
+        "alpha_range": [round(min(alphas), 3), round(max(alphas), 3)],
+        "beta_range": [round(min(betas), 3), round(max(betas), 3)],
+        "stable": stable,
+        "recommend": stable and gain > 2 * se,
+    }
 
 
-def summarize(races: Sequence[Race], tz_name: str, engine=None) -> Dict[str, Any]:
+def summarize(races: Sequence[Race], tz_name: str, engine=None, current_blend: tuple = (0.6, 0.4)) -> Dict[str, Any]:
     settled = _settled(races)
     by_type: Dict[str, Dict[str, Any]] = {}
     for race in settled:
@@ -182,7 +223,7 @@ def summarize(races: Sequence[Race], tz_name: str, engine=None) -> Dict[str, Any
         "overlay_clv": (sum(r["odds_at_pull"] / r["odds_final"] - 1 for r in overlays) / len(overlays)) if overlays else None,
     }
     log_loss = {k: _log_loss(settled, k) for k in ("p_true", "p_public", "p_paced", "p_fund")}
-    blend = fit_blend(settled, engine) if engine is not None else None
+    blend = fit_blend(settled, engine, current_blend) if engine is not None else None
     return {
         "races": len(settled),
         "races_pending": sum(1 for r in races if r.status == "published" and r.result_status not in ("official", "unavailable")),
