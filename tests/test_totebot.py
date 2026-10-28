@@ -972,3 +972,39 @@ def test_suggested_haircut_from_late_odds_drop(tmp_path):
     assert s["clv"]["suggested_haircut"] == pytest.approx((1 / 3 + 2 / 7) / 2, abs=1e-3)
     page = render(s, settings(tmp_path))
     assert "Typical shrink" in page and "ODDS_HAIRCUT=0.31" in page
+
+
+def test_odds_recorded_every_30s_until_the_off(tmp_path):
+    store = RaceStore(tmp_path)
+    race = sample_race(post_in_min=10)
+    store.save(race)
+    src = FakeSource()
+    sched = RaceScheduler(settings(tmp_path), store, src)
+    post = race.post_time
+    run(sched.tick(post - timedelta(minutes=2.9)))           # pull + compute
+    tickets = json.dumps(race.tickets, sort_keys=True)
+    polls = len(race.odds_history)
+    for secs in range(15, 9 * 60, 15):                        # every 15s from 2:45 MTP to post + 6:00
+        run(sched.tick(post - timedelta(minutes=2.9) + timedelta(seconds=secs)))
+    mtps = [h["mtp"] for h in race.odds_history[polls:]]
+    assert len(mtps) == 15 and mtps[0] == 2.4 and mtps[-1] == -4.6   # every 30s until 5 min after post
+    assert min(mtps) >= -5.0 and max(mtps) <= 2.5
+    assert json.dumps(race.tickets, sort_keys=True) == tickets   # recording never changes the tickets
+
+
+def test_drift_by_mtp(tmp_path):
+    from totebot.models import Race as R
+    from totebot.performance import drift_by_mtp, settle
+
+    post = utcnow()
+    hist = [{"t": (post - timedelta(minutes=m)).isoformat(), "mtp": m, "odds": {"4": o4, "6": o6, "8": 3.0, "1": 6.0}}
+            for m, o4, o6 in ((3, 5.0, 9.0), (1, 4.0, 7.0), (0.1, 3.5, 6.5))]
+    result = dict(RESULT, final_odds={"4": 3.0, "6": 6.0, "8": 3.0, "1": 6.0})
+    race = R(id="X-1", track="X", race_number=1, post_time=post, runners=[], status="published", tickets=TICKETS,
+             result=result, settlement=settle(TICKETS, result), result_status="official", odds_history=hist)
+    rows = {d["mtp"]: d for d in drift_by_mtp([race])}
+    assert set(rows) == {3, 1, 0}
+    # overlays #4 and #6: at 3 MTP 5.0->3.0 shrinks 1/2 and 9.0->6.0 shrinks 3/8; median 0.4375
+    assert rows[3]["overlay_shrink"] == pytest.approx((0.5 + 0.375) / 2)
+    assert rows[1]["overlay_shrink"] == pytest.approx((1 / 3 + 1 / 6) / 2)
+    assert rows[0]["overlays"] == 2 and rows[0]["overlay_shrink"] < rows[1]["overlay_shrink"]

@@ -4,6 +4,7 @@ All tickets are settled as if they were bet as printed (paper trading).
 """
 import math
 import statistics
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Sequence
 
 from .models import Race
@@ -158,6 +159,45 @@ def closing_comparison(races: Sequence[Race]) -> Optional[Dict[str, Any]]:
     se = math.sqrt(sum((d - gain) ** 2 for d in diffs) / (len(diffs) - 1) / len(diffs))
     return {"races": len(diffs), "model": sum(model) / len(model), "final": sum(final) / len(final),
             "gain": gain, "gain_se": se}
+
+
+DRIFT_CHECKPOINTS = [5, 3, 2, 1, 0]   # minutes to post
+DRIFT_TOLERANCE_MIN = 0.5
+
+
+def _shrink(then: float, final: float) -> float:
+    """How much a horse's odds-to-1 shrank from `then` to the off (the engine's haircut units)."""
+    return 1 - (final - 1) / (then - 1)
+
+
+def drift_by_mtp(races: Sequence[Race]) -> List[Dict[str, Any]]:
+    """For each checkpoint (minutes before the actual post time), how much the odds still shrank
+    before the off: for the ticket's overlays (what gets bet) and for all horses. The latest
+    checkpoint you can bet at is the best pull time, and its overlay shrink is its ODDS_HAIRCUT."""
+    out = []
+    for cp in DRIFT_CHECKPOINTS:
+        overlays, everyone, race_count = [], [], 0
+        for race in races:
+            final = race.result.get("final_odds") or {}
+            polls = [(((race.post_time - datetime.fromisoformat(h["t"])).total_seconds() / 60), h["odds"])
+                     for h in race.odds_history or [] if h.get("t")]
+            near = [(abs(m - cp), odds) for m, odds in polls if abs(m - cp) <= DRIFT_TOLERANCE_MIN]
+            if not near or not final:
+                continue
+            odds_then = min(near, key=lambda x: x[0])[1]
+            race_count += 1
+            for r in race.tickets.get("runners") or []:
+                n = r["program_num"]
+                if odds_then.get(n, 0) > 1 and final.get(n):
+                    s = _shrink(odds_then[n], final[n])
+                    everyone.append(s)
+                    if r["ev"] > 0:
+                        overlays.append(s)
+        if race_count:
+            out.append({"mtp": cp, "races": race_count, "overlays": len(overlays),
+                        "overlay_shrink": statistics.median(overlays) if overlays else None,
+                        "all_shrink": statistics.median(everyone) if everyone else None})
+    return out
 
 
 EV_BUCKETS = [(-math.inf, -0.25, "below −25%"), (-0.25, 0.0, "−25% to 0"), (0.0, 0.10, "0 to +10%"),
@@ -329,6 +369,7 @@ def summarize(races: Sequence[Race], tz_name: str, engine=None, current_blend: t
         "blend_fit": blend,
         "closing": closing_comparison(settled),
         "ev_buckets": ev_buckets(settled),
+        "drift": drift_by_mtp(settled),
         "exotic_check": exotic_check(settled),
         "min_races_for_fit": MIN_RACES_FOR_FIT,
     }

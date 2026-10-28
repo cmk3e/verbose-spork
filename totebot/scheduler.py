@@ -18,7 +18,9 @@ POST_TIME_TOLERANCE_S = 30
 RESULT_FIRST_CHECK_MIN = 3      # start looking for the official result this long after post
 RESULT_CHECK_INTERVAL_S = 120
 RESULT_GIVE_UP_MIN = 180
-ODDS_HISTORY_MAX = 60
+ODDS_HISTORY_MAX = 90
+TRACK_INTERVAL_S = 30   # after the pull, keep recording the odds this often...
+TRACK_UNTIL_MIN = 5     # ...until this long after post (records only; tickets don't change)
 
 
 class RaceScheduler:
@@ -56,7 +58,8 @@ class RaceScheduler:
             await asyncio.sleep(self.s.tick_seconds)
 
     async def tick(self, now: Optional[datetime] = None) -> None:
-        races = [r for r in self.store.all() if r.status in ("scheduled", "preview", "ready") or self._awaiting_result(r)]
+        races = [r for r in self.store.all()
+                 if r.status in ("scheduled", "preview", "ready") or self._awaiting_result(r) or self._tracking_due(r, now or utcnow())]
         await asyncio.gather(*(self._process(r, now) for r in races))
 
     async def _process(self, race: Race, now: Optional[datetime]) -> None:
@@ -77,8 +80,30 @@ class RaceScheduler:
                     await self._prepoll(race, now)
             if race.status == "ready" and race.mtp(now) <= self.s.publish_mtp:
                 await self._publish(race, now)
+            if self._tracking_due(race, now):
+                await self._track_odds(race, now)
             if self._awaiting_result(race):
                 await self._check_result(race, now)
+
+    @staticmethod
+    def _tracking_due(race: Race, now: datetime) -> bool:
+        """After the pull, record the odds every TRACK_INTERVAL_S up to the off, to measure how much
+        they still move (and so when to pull and how big ODDS_HAIRCUT should be)."""
+        if race.status not in ("ready", "published") or race.result_status == "official":
+            return False
+        if race.mtp(now) < -TRACK_UNTIL_MIN:
+            return False
+        last = race.odds_history[-1]["t"] if race.odds_history else None
+        return last is None or (now - datetime.fromisoformat(last)).total_seconds() >= TRACK_INTERVAL_S
+
+    async def _track_odds(self, race: Race, now: datetime) -> None:
+        try:
+            snap = await self.source.fetch(race)
+        except Exception as e:  # recording only: never disturb the race
+            log.debug("Odds tracking failed for %s: %s", race.id, e)
+            return
+        self._observe(race, snap, now)
+        self.store.save(race)
 
     @staticmethod
     def _awaiting_result(race: Race) -> bool:

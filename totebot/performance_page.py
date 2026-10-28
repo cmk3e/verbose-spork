@@ -132,6 +132,18 @@ def render(summary: Dict[str, Any], settings: Settings) -> str:
                   if clv["suggested_haircut"] > settings.odds_haircut + 0.03 else ", which is about right.</p>")
                if clv.get("suggested_haircut") is not None else ""))
 
+        drift = summary.get("drift") or []
+        if drift:
+            parts.append(
+                "<h3>When to pull: how much the odds still drop</h3>"
+                '<p class="muted">For each time before post, the typical drop still to come in the odds before the off. '
+                "Pull at the latest time you can still bet, and set ODDS_HAIRCUT to that row's overlay figure. "
+                "2, 1 and 0 MTP only fill in for races run since odds started being recorded every 30 seconds.</p>"
+                + _table(["Minutes to post", "Races", "Overlays", "Overlay odds drop", "All horses"], [
+                    [f"{d['mtp']} MTP", str(d["races"]), str(d["overlays"]),
+                     _pct(d["overlay_shrink"]) if d["overlay_shrink"] is not None else "–",
+                     _pct(d["all_shrink"]) if d["all_shrink"] is not None else "–"] for d in drift]))
+
         buckets = summary.get("ev_buckets") or []
         if buckets:
             parts.append(
