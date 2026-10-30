@@ -173,6 +173,12 @@ def create_app(settings: Optional[Settings] = None, start_scheduler: bool = True
                     (upload_dir / "last-rejected.txt").write_text(
                         f"{file.filename}: {e}\n\n" + brisnet.diagnose(pages))
                     raise ValueError(f"{e} (details: open /debug/upload)") from e
+                if any("not a Brisnet" in n for n in skipped):
+                    upload_dir.mkdir(parents=True, exist_ok=True)
+                    (upload_dir / "last-rejected.txt").write_text(
+                        f"{file.filename}: loaded {len(races)} races; not read:\n" + "\n".join(skipped)
+                        + "\n" + brisnet.diagnose_skipped(pages, skipped))
+                    skipped = skipped + ["Samples of the pages not read: open /debug/upload"]
                 return upload_result(races, replace, skipped)
             text = data.decode("utf-8-sig")
             if (file.filename or "").lower().endswith(".json") or text.lstrip().startswith(("{", "[")):
@@ -314,7 +320,7 @@ def create_app(settings: Optional[Settings] = None, start_scheduler: bool = True
 
     @app.get("/debug/upload", include_in_schema=False, dependencies=[Depends(auth)])
     def debug_upload():
-        """Why the last PDF upload was rejected."""
+        """Why the last PDF upload was rejected, or which of its races could not be read."""
         report = upload_dir / "last-rejected.txt"
         body = (
             '<button onclick="navigator.clipboard.writeText(document.getElementById(\'s\').innerText)'

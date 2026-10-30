@@ -31,10 +31,12 @@ RACE_TYPES = {"alw", "mdn", "md", "mc", "clm", "oc", "stk", "hcp", "str", "msw",
               "s", "g1", "g2", "g3", "spwt", "mdspwt", "mdsp", "mcl", "trl", "fut", "dby", "oaks"}
 SMALL_WORDS = {"at", "the", "of", "de", "la", "a", "big"}
 
-HEADER = re.compile(r"Ultimate PP's w/ QuickPlay Comments (?P<rest>.+?)\s+"
+# Long track names are printed over "Comments", so the name can come out glued to it or on the next line.
+HEADER = re.compile(r"Ultimate PP's w/ QuickPlay Comm?e?n?t?s?\s*(?P<rest>[A-Z].+?)\s+"
                     r"(?P<date>[A-Z][a-z]+ \d{1,2}, \d{4})\s+Race (?P<race>\d+)\s*$", re.M)
 POST = re.compile(r"Post\s*Time:?\s*\(?\s*(\d{1,2})\s*:\s*(\d{2})")
 TOC_RACE = re.compile(r"^Race (\d+)$")
+TOC_LINE = re.compile(r"^Race \d+$", re.M)
 HORSE = re.compile(r"^(?P<num>\d{1,2}[A-Z]?) (?P<name>.+?) \((?P<style>E/P|E|P|S|NA)\s*(?P<qsp>\d)?\)\s*Own:", re.M)
 ML = re.compile(r"^\s*(\d{1,3}/\d{1,2})\b", re.M)
 PRIME = re.compile(r"Prime Power:\s*([\d.]+)")
@@ -293,6 +295,25 @@ def load_pages(pages: List[str]) -> Tuple[List[dict], List[str]]:
         if (track.lower(), num) not in found and f"{track} r{num}".lower() not in noted:
             skipped.append(f"{track} R{num}: not a Brisnet Ultimate PP (probably Equineline)")
     return races, skipped
+
+
+def diagnose_skipped(pages: List[str], skipped: List[str], limit: int = 4) -> str:
+    """For races listed on the cover but not read: the start of the first page mentioning each
+    track, so the reader can be fixed."""
+    names = []
+    for note in skipped:
+        m = re.match(r"(.+?) R\d+: not a Brisnet", note)
+        if m and m.group(1) not in names:
+            names.append(m.group(1))
+    lines = []
+    for name in names[:limit]:
+        mentions = [i for i, t in enumerate(pages) if name.lower() in t.lower() and not TOC_LINE.search(t)]
+        idx = next((i for i in mentions if not HEADER.search(pages[i])), mentions[0] if mentions else None)
+        if idx is None:
+            lines.append(f"\n--- {name}: no page found that mentions it")
+        else:
+            lines.append(f"\n--- {name}: page {idx + 1}, first 1500 characters:\n{pages[idx][:1500]}")
+    return "\n".join(lines)
 
 
 def diagnose(pages: List[str]) -> str:

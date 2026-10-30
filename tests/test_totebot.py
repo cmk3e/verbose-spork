@@ -450,6 +450,31 @@ def test_brisnet_partial_pdf_reports_skipped():
                        "Belmont Park R2: not a Brisnet Ultimate PP (probably Equineline)"]
 
 
+def test_brisnet_long_track_name_printed_over_header():
+    from totebot.brisnet import parse_pages
+
+    for glued in ("Ultimate PP's w/ QuickPlay CommeCentury Downs TB", "Ultimate PP's w/ QuickPlay Comments\nCentury Downs TB",
+                  "Ultimate PP's w/ QuickPlay CommentsCentury Downs TB"):
+        page = BRISNET_PAGE.replace("Ultimate PP's w/ QuickPlay Comments Belmont Park", glued).format(race=7, post="11:12")
+        races = parse_pages([page])
+        assert [(r["track_name"], r["race_number"]) for r in races] == [("Century Downs", 7)], glued
+
+
+def test_upload_reports_samples_of_races_not_read(tmp_path, monkeypatch):
+    from totebot import brisnet
+
+    cover = "Free Past Performances\nBelmont Park\n Race 2\n 3\nRace 3\n 4\n"
+    other = "Belmont Park something else entirely\nPost Time 1:00"
+    monkeypatch.setattr(brisnet, "pdf_pages", lambda data: [cover, BRISNET_PAGE.format(race=3, post="2:16"), other])
+    app = create_app(settings(tmp_path, password="pw"), start_scheduler=False)
+    with TestClient(app) as c:
+        c.auth = ("admin", "pw")
+        r = c.post("/api/races/upload", files={"file": ("pp.pdf", b"%PDF-1.4", "application/pdf")}).json()
+        assert r["skipped"][-1] == "Samples of the pages not read: open /debug/upload"
+        page = c.get("/debug/upload").text
+        assert "Belmont Park R2: not a Brisnet" in page and "page 3, first 1500 characters" in page
+
+
 def test_post_time_10_or_11_oclock_morning_or_night():
     from datetime import datetime
     from zoneinfo import ZoneInfo
