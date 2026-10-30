@@ -9,7 +9,7 @@ import csv
 import io
 import re
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
 
@@ -62,26 +62,34 @@ def _track_name(rest: str) -> str:
     words = []
     for w in rest.split():
         clean = w.strip("™‘’'\"").lower()
-        abbrev = len(clean) >= 2 and w.strip("™‘’'\"").isupper()  # race-type codes like MC, OC, AOC
+        bare = w.strip("™‘’'\"")
+        # race-type codes like MC, OC, AOC, OClm (track names are capitalised words, never all caps or OClm)
+        abbrev = len(clean) >= 2 and (bare.isupper() or any(c.isupper() for c in bare[1:]))
         if not w[:1].isalpha() or clean in RACE_TYPES or abbrev or not (w[:1].isupper() or clean in SMALL_WORDS):
             break
         words.append(w)
     return " ".join(words) or "TRACK"
 
 
-def _post_times(times: Dict[int, tuple], day: datetime, now: Optional[datetime] = None) -> Dict[int, datetime]:
-    """Clock times without AM/PM -> datetimes. 12:xx-9:xx are afternoon/evening. 10:xx-11:xx could be
-    morning or night: take whichever hasn't already passed. Later races never go before earlier ones.
-    (TVG's post time corrects a wrong guess when the race is polled.)"""
-    now = now or datetime.now(timezone.utc)
+def _post_times(times: Dict[int, tuple], day: datetime) -> Dict[int, datetime]:
+    """Clock times without AM/PM -> datetimes. 12:xx-9:xx are afternoon/evening. 10:xx-11:xx are
+    morning at the start of a card (an earlier race already in the afternoon makes them night; with
+    no earlier race known, a race 1-4 or one followed by an afternoon race is morning). Later races
+    never go before earlier ones. (TVG's post time corrects a wrong guess when the race is polled.)"""
     out: Dict[int, datetime] = {}
     prev: Optional[datetime] = None
-    for race in sorted(times):
+    order = sorted(times)
+    for i, race in enumerate(order):
         h, m = times[race]
         dt = day.replace(hour=(h % 12) + 12, minute=m)
         if h in (10, 11):
             morning = day.replace(hour=h, minute=m)
-            if morning >= now - timedelta(minutes=10) and not (prev and morning < prev):
+            if prev is not None:
+                is_morning = prev <= morning
+            else:
+                following = times[order[i + 1]][0] if i + 1 < len(order) else None
+                is_morning = race <= 4 or (following is not None and following not in (10, 11))
+            if is_morning:
                 dt = morning
         while prev and dt < prev:
             dt += timedelta(hours=12)

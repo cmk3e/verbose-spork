@@ -395,6 +395,8 @@ def test_brisnet_multi_track_pdf():
     ("Keeneland MC 40000 6 Furlongs", "Keeneland"),
     ("Belmont at the Big A Alw 100000n1x", "Belmont at the Big A"),
     ("Delta Downs MSW 25000", "Delta Downs"),
+    ("Belmont Park OClm 45000 7 Furlongs (T) 3&up", "Belmont Park"),
+    ("Laurel Park OClm 25000", "Laurel Park"),
 ])
 def test_brisnet_track_name(rest, name):
     from totebot.brisnet import _track_name
@@ -448,17 +450,18 @@ def test_brisnet_partial_pdf_reports_skipped():
                        "Belmont Park R2: not a Brisnet Ultimate PP (probably Equineline)"]
 
 
-def test_post_time_10_or_11_oclock_picks_the_one_still_ahead():
-    from datetime import datetime, timezone
+def test_post_time_10_or_11_oclock_morning_or_night():
+    from datetime import datetime
     from zoneinfo import ZoneInfo
     from totebot.brisnet import _post_times
 
     day = datetime(2026, 10, 23, tzinfo=ZoneInfo("America/New_York"))
-    morning = datetime(2026, 10, 23, 13, 0, tzinfo=timezone.utc)   # 9 AM ET
-    evening = datetime(2026, 10, 23, 18, 0, tzinfo=timezone.utc)   # 2 PM ET
-    assert _post_times({7: (10, 15)}, day, morning)[7].hour == 10
-    assert _post_times({7: (10, 15)}, day, evening)[7].hour == 22
-    assert _post_times({1: (11, 30), 2: (12, 1), 9: (10, 5)}, day, morning)[9].hour == 22
+    hours = lambda times: [t.strftime("%H:%M") for _, t in sorted(_post_times(times, day).items())]
+    # an early race that has already run when the card is uploaded stays in the morning
+    assert hours({1: (11, 55), 2: (12, 30), 4: (1, 40), 5: (2, 15)}) == ["11:55", "12:30", "13:40", "14:15"]
+    assert hours({1: (11, 30), 2: (12, 1), 9: (10, 5)}) == ["11:30", "12:01", "22:05"]
+    assert hours({7: (10, 15)}) == ["22:15"] and hours({2: (10, 15)}) == ["10:15"]
+    assert hours({9: (10, 5), 10: (10, 35)}) == ["22:05", "22:35"]
 
 
 def test_upload_skips_existing_races(tmp_path, monkeypatch):
