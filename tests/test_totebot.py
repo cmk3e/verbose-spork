@@ -1091,3 +1091,102 @@ def test_candidate_used_on_tickets_when_switched_on(tmp_path):
     assert sum(r["p_true"] for r in on["runners"]) == pytest.approx(1.0, abs=1e-3)
     page = render({"races": 0, "races_pending": 0, "candidate": candidate.load(tmp_path)}, settings(tmp_path))
     assert "Candidate model" in page and "150</b> of the 500 needed" in page and "Not enough data yet" in page
+
+
+EQUIBASE_SUMMARY = """5
+Prevagen Breeders' Cup Turf Sprint
+Exacta / Trifecta / Superfecta Pick 3 (Races 5-6-7) / Daily Double / Super High Five
+5 1/2 Furlongs. STAKES. For Thoroughbred three year olds and up. Purse: $1,000,000.
+Race Rating
+122
+Post Time: 1:48 PM
+1 1 (10%) John the Beer Man 100 143 120 143 98 102 105 Carmouche K / Atras R 43% 47% 64%
+2 2 (23%) Shisospicy 97 85 111 131 82 100 120 Saez L / D'Angelo J 43% 43% 38%
+15 15 (0%) Big Mojo (IRE) 106 NA 119 119 NA 106 106 Marquand T / Appleby M 0% 0% 0%
+Saturday, October 31, 2026 Help
+Speed Figure Analysis for KEENELAND
+KEE - 10/31/2026 Copyright 2026 EQUIBASE Company LLC. All Rights Reserved. Page 2 of 4"""
+
+EQUIBASE_P1 = """Program Help
+10/31/26 APPROX. POST: 1:48PM Exacta / Trifecta / Superfecta Pick 3 (Races 5-6-7)
+5
+equibase.com/QR
+Race Rating
+122
+Purse $1,000,000. For Three Year Olds and Upward. Five And One Half Furlongs (Turf)
+Track Record: Somebody(4),121 lbs; 1:01.50 (10-4-20)
+1
+Red
+30-1
+Owner: Somebody Racing 100
+Silks: Red, white cap
+Trainer: R Atras ( 0-0-0-0 ) 0% Kendrick Carmouche
+( 0-0-0-0 ) 0%
+2026: 4 2 0 0 105 $300,000 Turf: 8 4 1 1 105 $500,000
+Life: 8 4 1 1 105 $500,000 Dirt: 0 0 0 0 na $0
+KEE: 1 0 0 0 91 $5,000 Distance: 3 2 0 0 105 $200,000John the Beer Man  126
+B.g.5 Some Sire ($5,000) - Some Dam by Other Sire - Bred in New York by Someone (Apr 1, 2021)
+A 05Sep26 Sar6 fm 5½f 35 :21¹ 3 Stk - TurfSprnt - 200k 143 98 1 1¹ Carmouche K 126 4.10 John the Beer Man126¹ led 8
+Workout(s): 23 Oct 26 Bel 4F fm :48.74 Breezing 4/34
+Trainer (Last 365 days): All: 207 20% $1.97 Dist/Surf: 50 22% $2.10 With Jockey: 29 20% $1.46
+2
+White
+15-1
+Owner: Another Stable 97
+Silks: Blue
+Trainer: J D'Angelo ( 0-0-0-0 ) 0% Luis Saez
+( 0-0-0-0 ) 0%
+Life: 10 6 1 0 120 $400,000 Turf: 7 5 1 0 120 $350,000
+KEE: 1 1 0 0 97 $60,000 Distance: 3 2 0 0 103 $100,000
+Shisospicy \x04 123½
+Ch.c.4 Sire Two ($10,000) - Dam Two by Sire Three - Bred in Kentucky by Breeder (Mar 1, 2022)
+A 30Apr26 Kee6 fm 5½f 35 :21¹ 3 Stk - Stakes - 200k 85 82 2 3¹ Saez L 123 2.10 Winner123¹ ran on 8
+KEE-10/31/2026-5 Copyright 2026 EQUIBASE Company LLC. All Rights Reserved. RACE 5 CONTINUED ON NEXT PAGE"""
+
+EQUIBASE_P2 = """RACE 5 CONTINUED Keeneland
+A
+E15
+Khaki
+20-1
+Owner: RP Racing, Ltd. 106
+Silks: Blue and red quarters
+Trainer: Michael Appleby ( 0-0-0-0 ) 0% Tom Marquand
+( 0-0-0-0 ) 0%
+Life: 17 4 3 1 106 $882,734 Turf: 17 4 3 1 106 $882,734
+KEE: 0 0 0 0 na $0 Dist: 0 0 0 0 na $0 AllWeather: 0 0 0 0 na $0Big Mojo (IRE) 126
+Dk B/ Br.c.4 Mohaather (GB) ($15,915) - Jm Jackson (IRE) by No Nay Never - Bred in Ireland by Ringfort Stud
+05Sep26 Hay(ENG) sf  6f 27 1:15  3 Stk - Sprint Cup S. G1 - 541k T-91 7 3 Buick W 131 9.00 Almeraq131 lost 2nd 8
+With Jockey: 0 0% $0.00"""
+
+
+def test_equibase_parse():
+    from totebot.equibase import detect, load_pages
+
+    pages = ["FRIDAY PPs SATURDAY PPs", EQUIBASE_SUMMARY, EQUIBASE_P1, EQUIBASE_P2]
+    assert detect(pages)
+    races, skipped = load_pages(pages)
+    race = races[0]
+    assert skipped == [] and len(races) == 1
+    assert (race["track"], race["track_name"], race["race_number"], race["surface"]) == ("KEE", "Keeneland", 5, "Trf")
+    assert race["post_time"] == "2026-10-31T13:48:00-04:00"
+    one, two, ae = race["runners"]
+    assert (one["program_num"], one["name"], one["ml_odds"], one["rating"]) == ("1", "John the Beer Man", "30-1", 102.0)
+    s = one["stats"]
+    assert (s["eqb_class"], s["eqb_last_pace"], s["eqb_avg_speed_3"], s["eqb_high_speed"], s["last_speed"]) == (100, 143, 102, 105, 98)
+    assert (s["life_starts"], s["life_wins"], s["surface_starts"], s["surface_wins"], s["surface_best_speed"]) == (8, 4, 8, 4, 105)
+    assert (s["track_starts"], s["dist_wins"], s["days_off"], s["weight"], s["post_win_pct"]) == (1, 2, 56, 126, 10)
+    assert (s["trainer_win_pct_365"], s["trainer_roi_365"], s["trainer_jockey_roi"], s["jockey_trainer_itm_pct"]) == (20, 1.97, 1.46, 64)
+    assert (two["name"], two["stats"]["weight"], two["rating"]) == ("Shisospicy", 123, 100.0)
+    assert (ae["program_num"], ae["name"], ae["stats"]["also_eligible"], ae["rating"]) == ("E15", "Big Mojo (IRE)", 1, 106.0)
+    assert "eqb_last_speed" not in ae["stats"] and ae["stats"]["days_off"] == 56
+
+
+def test_pdf_upload_reads_every_format_in_the_file(tmp_path, monkeypatch):
+    from totebot import brisnet
+
+    monkeypatch.setattr(brisnet, "pdf_pages", lambda data: [EQUIBASE_SUMMARY, EQUIBASE_P1, EQUIBASE_P2, PICKPONY_P1, PICKPONY_P2])
+    app = create_app(settings(tmp_path, password="pw"), start_scheduler=False)
+    with TestClient(app) as c:
+        c.auth = ("admin", "pw")
+        r = c.post("/api/races/upload", files={"file": ("pp.pdf", b"%PDF-1.4", "application/pdf")}).json()
+        assert sorted(x["id"] for x in r["races"]) == ["FL-20261026-R1", "KEE-20261031-R5"]

@@ -9,7 +9,7 @@ import secrets
 from contextlib import asynccontextmanager
 from datetime import timezone
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile, status
@@ -17,7 +17,7 @@ from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 
-from . import brisnet, candidate, performance, performance_page, pickpony
+from . import brisnet, candidate, equibase, performance, performance_page, pickpony
 from .cards import CardError, parse_post_time, races_from_csv, races_from_json
 from .config import Settings, get_settings
 from .handicap import load_engine
@@ -29,6 +29,29 @@ from .store import RaceStore
 
 log = logging.getLogger("totebot")
 STATIC = Path(__file__).parent / "static"
+
+
+def read_pdf_cards(pages: List[str]) -> Tuple[List[dict], List[str]]:
+    """Races from every PP format found in the PDF (daily free-PP files mix Brisnet and Equibase)."""
+    readers = [m for m in (pickpony, equibase) if m.detect(pages)]
+    if not readers or any(brisnet.HEADER.search(p) for p in pages):
+        readers.append(brisnet)
+    races: List[dict] = []
+    skipped: List[str] = []
+    errors: List[str] = []
+    for reader in readers:
+        try:
+            got, notes = reader.load_pages(pages)
+        except brisnet.BrisnetError as e:
+            errors.append(str(e))
+            continue
+        races += got
+        skipped += notes
+    if not races:
+        raise brisnet.BrisnetError("; ".join(errors))
+    found = {f"{r['track_name']} R{r['race_number']}".lower() for r in races}
+    skipped = [s for s in skipped if not ("probably Equineline" in s and s.split(":")[0].lower() in found)]
+    return races, skipped
 
 
 def create_app(settings: Optional[Settings] = None, start_scheduler: bool = True) -> FastAPI:
@@ -142,8 +165,7 @@ def create_app(settings: Optional[Settings] = None, start_scheduler: bool = True
             if data[:5] == b"%PDF-":
                 pages = await asyncio.to_thread(brisnet.pdf_pages, data)  # big PDFs take a while
                 try:
-                    reader = pickpony if pickpony.detect(pages) else brisnet
-                    parsed, skipped = reader.load_pages(pages)
+                    parsed, skipped = read_pdf_cards(pages)
                     races = races_from_json(parsed, settings.timezone)
                 except (CardError, ValueError) as e:
                     upload_dir.mkdir(parents=True, exist_ok=True)

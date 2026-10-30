@@ -76,6 +76,12 @@ Fundamentals are taken in this order: `p_fund` â†’ `features` + trained model â†
 
 PickPony PP PDFs upload the same way as Brisnet ones (Totebot detects the format). Per horse it reads the program number, name, style + Quirin points, morning line, Prime Power to two decimals (the number under the name; used as the rating), the last-3 E1/E2/LP pace averages (fed to the engine's %-early), and records the summary figures with their field ranks, records by surface and distance with pedigree ratings, jockey/trainer win %, trainer-alert ROIs, Lasix, weight, race pars and race-by-race speed figures, using the same stat names as Brisnet where the meaning matches.
 
+## Equibase PDFs
+
+Equibase program PDFs (the official Breeders' Cup PPs, track programs, and the Equibase pages inside daily free-PP files) upload the same way. A file that mixes formats gets every race read by the reader that fits it. Per horse it reads the program number (also-eligibles keep their `E` numbers), name, morning line, weight, and, from the Speed Figure Analysis table, the Equibase class rating and last / average-of-3 / highest pace and speed figures with jockey and trainer in-the-money %. It also reads records (life, surface, distance, track), days off, and the trainer's 365-day and with-this-jockey win % and ROI.
+
+Equibase has no run styles, Quirin points or Prime Power, so the engine's pace adjustment is skipped. The fundamental `rating` is the average Equibase speed figure over the last 3 races. Horses without US figures (most European and Japanese shippers, first-time starters) get the field median. When most of the field has no figures, the morning line is used instead. Expect that in big international turf races and in maiden races.
+
 ## Live tote source (`TOTE_SOURCE`)
 
 | value | what it does |
