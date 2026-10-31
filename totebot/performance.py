@@ -80,8 +80,20 @@ def _paced(rows: Sequence[dict]) -> List[float]:
     return [x / total for x in raw]
 
 
+def unique_races(races: Sequence[Race]) -> List[Race]:
+    """Each real race once: a race loaded twice under different track names counts as its first copy."""
+    seen, out = set(), []
+    for race in sorted(races, key=lambda r: (r.post_time, r.id)):
+        key = race.same_race_key()
+        if key is not None and key in seen:
+            continue
+        seen.add(key)
+        out.append(race)
+    return out
+
+
 def _settled(races: Sequence[Race]) -> List[Race]:
-    return [r for r in races if r.result and r.settlement and r.tickets and r.result.get("finish")]
+    return unique_races([r for r in races if r.result and r.settlement and r.tickets and r.result.get("finish")])
 
 
 def history_rows(races: Sequence[Race], tz_name: str) -> List[Dict[str, Any]]:
@@ -386,6 +398,7 @@ def summarize(races: Sequence[Race], tz_name: str, engine=None, current_blend: t
     blend = fit_blend(settled, engine, current_blend) if engine is not None else None
     return {
         "races": len(settled),
+        "duplicates": sum(1 for r in races if r.result and r.settlement and r.tickets and r.result.get("finish")) - len(settled),
         "races_pending": sum(1 for r in races if r.status == "published" and r.result_status not in ("official", "unavailable")),
         "total": {"cost": cost, "return": ret, "profit": ret - cost, "roi": (ret - cost) / cost if cost else None},
         "by_type": by_type,

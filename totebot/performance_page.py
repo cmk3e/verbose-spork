@@ -71,7 +71,9 @@ def render(summary: Dict[str, Any], settings: Settings) -> str:
     n = summary["races"]
     pending = summary["races_pending"]
     waiting = f", {pending} waiting for results" if pending else ""
-    parts = [f'<p class="muted">{n} settled race{"s" if n != 1 else ""}{waiting}. '
+    dups = summary.get("duplicates", 0)
+    dup_note = f" {dups} duplicate{'s' if dups != 1 else ''} (same race loaded under two track names) not counted." if dups else ""
+    parts = [f'<p class="muted">{n} settled race{"s" if n != 1 else ""}{waiting}.{dup_note} '
              "Paper trading: every ticket is settled as if it was bet exactly as printed.</p>"]
     if n == 0:
         parts.append("<p>No settled races yet. Results are collected automatically a few minutes after each "

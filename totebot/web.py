@@ -90,8 +90,18 @@ def create_app(settings: Optional[Settings] = None, start_scheduler: bool = True
         """Save races. Existing ones are kept unless replace; with a `skipped` list they are noted
         there instead of failing the request."""
         out = []
+        by_key = {r.same_race_key(): r for r in store.all() if r.same_race_key() is not None}
         for race in races:
             existing = store.get(race.id)
+            twin = by_key.get(race.same_race_key()) if race.same_race_key() is not None else None
+            if not existing and twin and twin.id != race.id:
+                # same race under another track name: treat it as that race, never load a second copy
+                if not replace or twin.status == "published":
+                    if skipped is None:
+                        raise HTTPException(409, f"{race.id} is already loaded as {twin.id}")
+                    skipped.append(f"{race.track} R{race.race_number}: already loaded as {twin.id}")
+                    continue
+                store.delete(twin.id)
             if existing and not replace:
                 if skipped is None:
                     raise HTTPException(409, f"{race.id} already exists (send replace=true to overwrite)")

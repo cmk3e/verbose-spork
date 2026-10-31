@@ -1227,3 +1227,37 @@ def test_pdf_upload_reads_every_format_in_the_file(tmp_path, monkeypatch):
         c.auth = ("admin", "pw")
         r = c.post("/api/races/upload", files={"file": ("pp.pdf", b"%PDF-1.4", "application/pdf")}).json()
         assert sorted(x["id"] for x in r["races"]) == ["FL-20261026-R1", "KEE-20261031-R5"]
+
+
+def test_same_race_under_two_track_names_counts_once(tmp_path):
+    import copy
+    from totebot.performance import settle, summarize
+
+    race = sample_race()
+    t = run_handicap(race, tote(), settings(tmp_path))
+    result = {"finish": ["4", "6", "1", "2"], "final_odds": {}, "payoffs": {}, "scratched": []}
+    copies = []
+    for rid, track in (("FL-R5", "FL"), ("Finger Lakes-R5", "Finger Lakes")):
+        r = copy.deepcopy(race)
+        r.id, r.track, r.status, r.tickets, r.result = rid, track, "published", t, result
+        r.settlement, r.result_status = settle(t, result), "official"
+        copies.append(r)
+    s = summarize(copies, TZ)
+    assert (s["races"], s["duplicates"]) == (1, 1)
+    assert s["total"]["cost"] == pytest.approx(copies[0].settlement["total"]["cost"])
+
+
+def test_upload_does_not_add_the_same_race_under_another_track_name(tmp_path):
+    card = json.loads((EXAMPLES / "race_card.json").read_text())
+    app = create_app(settings(tmp_path, password="pw"), start_scheduler=False)
+    with TestClient(app) as c:
+        c.auth = ("admin", "pw")
+        first = c.post("/api/races/upload", files={"file": ("a.json", json.dumps(card), "application/json")}).json()
+        old_id = first["races"][0]["id"]
+        renamed = {**card, "track": "Somewhere Else"}
+        r = c.post("/api/races/upload", files={"file": ("b.json", json.dumps(renamed), "application/json")}).json()
+        assert r["races"] == [] and r["skipped"] == [f"Somewhere Else R{card['race_number']}: already loaded as {old_id}"]
+        r = c.post("/api/races/upload", data={"replace": "true"},
+                   files={"file": ("b.json", json.dumps(renamed), "application/json")}).json()
+        ids = [x["id"] for x in c.get("/api/races").json()]
+        assert len(ids) == 1 and ids[0] == r["races"][0]["id"] != old_id

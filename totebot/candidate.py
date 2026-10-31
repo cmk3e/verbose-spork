@@ -81,8 +81,10 @@ def has_extra_data(race: Race) -> bool:
 
 
 def training_data(races: Sequence[Race]) -> List[Tuple[List[List[float]], int, Race]]:
+    from .performance import unique_races
+
     out = []
-    for race in races:
+    for race in unique_races(races):
         if not (race.result and race.tickets and race.result.get("finish")) or not has_extra_data(race):
             continue
         rows = race.tickets.get("runners") or []

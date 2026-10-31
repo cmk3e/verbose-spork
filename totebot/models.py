@@ -1,6 +1,6 @@
 import re
 from dataclasses import asdict, dataclass, field, fields
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 # Race lifecycle:
@@ -134,6 +134,15 @@ class Race:
 
     def mtp(self, now: Optional[datetime] = None) -> float:
         return ((self.post_time - (now or utcnow())).total_seconds()) / 60.0
+
+    def same_race_key(self) -> Optional[tuple]:
+        """The same real race loaded twice under different track names ("FL R5" and "Finger Lakes
+        R5") has the same day, race number and horses. None when there are no horses to compare."""
+        names = frozenset(re.sub(r"[^a-z0-9]", "", r.name.lower()) for r in self.runners if r.name)
+        if len(names) < 2:
+            return None
+        day = (self.post_time - timedelta(hours=8)).date()  # night races past midnight UTC stay on their day
+        return day, self.race_number, names
 
     def note(self, msg: str, now: Optional[datetime] = None) -> None:
         stamp = (now or utcnow()).strftime("%H:%M:%S")
