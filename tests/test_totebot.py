@@ -475,6 +475,15 @@ def test_upload_reports_samples_of_races_not_read(tmp_path, monkeypatch):
         assert "Belmont Park R2: not a Brisnet" in page and "page 3, first 1500 characters" in page
 
 
+@pytest.mark.parametrize("icon", [" \uf0b7", "\U0001f3c6 ", " \x04\n", "\ue000"])
+def test_brisnet_horse_with_icon_after_style(icon):
+    from totebot.brisnet import parse_pages
+
+    page = BRISNET_PAGE.replace("(E/P 4)Own:", "(E/P 4)" + icon + "Own:").format(race=3, post="2:16")
+    races = parse_pages([page])
+    assert [r["program_num"] for r in races[0]["runners"]][:1] == ["1"]
+
+
 def test_post_time_10_or_11_oclock_morning_or_night():
     from datetime import datetime
     from zoneinfo import ZoneInfo
