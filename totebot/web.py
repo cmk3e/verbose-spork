@@ -49,6 +49,21 @@ def read_pdf_cards(pages: List[str]) -> Tuple[List[dict], List[str]]:
         skipped += notes
     if not races:
         raise brisnet.BrisnetError("; ".join(errors))
+    # The same race read by two readers (a file mixing formats): keep the copy with more horses.
+    best: Dict[tuple, dict] = {}
+    for r in races:
+        key = (r["track"], r["race_number"], r["post_time"][:10])
+        if key not in best or len(r["runners"]) > len(best[key]["runners"]):
+            best[key] = r
+    races = []
+    for r in best.values():
+        if len(r["runners"]) < 2:
+            skipped.append(f"{r['track_name']} R{r['race_number']}: only {len(r['runners'])} horse read from the PDF; "
+                           "race not loaded")
+        else:
+            races.append(r)
+    if not races:
+        raise brisnet.BrisnetError("; ".join(skipped))
     found = {f"{r['track_name']} R{r['race_number']}".lower() for r in races}
     skipped = [s for s in skipped if not ("probably Equineline" in s and s.split(":")[0].lower() in found)]
     return races, skipped

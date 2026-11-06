@@ -1261,3 +1261,19 @@ def test_upload_does_not_add_the_same_race_under_another_track_name(tmp_path):
                    files={"file": ("b.json", json.dumps(renamed), "application/json")}).json()
         ids = [x["id"] for x in c.get("/api/races").json()]
         assert len(ids) == 1 and ids[0] == r["races"][0]["id"] != old_id
+
+
+def test_pdf_race_with_one_horse_is_skipped_not_fatal(tmp_path, monkeypatch):
+    from totebot import brisnet
+
+    one_horse = BRISNET_PAGE.replace("Belmont Park", "Laurel Park").format(race=7, post="2:16")
+    one_horse = one_horse[:one_horse.index("\n2 ")] if "\n2 " in one_horse else one_horse
+    monkeypatch.setattr(brisnet, "pdf_pages", lambda data: [BRISNET_PAGE.format(race=3, post="2:16"), one_horse])
+    app = create_app(settings(tmp_path, password="pw"), start_scheduler=False)
+    with TestClient(app) as c:
+        c.auth = ("admin", "pw")
+        r = c.post("/api/races/upload", files={"file": ("pp.pdf", b"%PDF-1.4", "application/pdf")})
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert [x["id"][:3] for x in body["races"]] == ["BEL"]
+        assert any("Laurel Park R7: only 1 horse read" in s for s in body["skipped"])
