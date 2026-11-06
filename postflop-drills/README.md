@@ -22,7 +22,7 @@ Tests (Node 18+): `node test/engine.test.js`
 
 ## Using your own preflop charts
 
-The app reads ranges from `ranges-data.js` when that file exists. Without it, the app uses simplified built-in ranges at about 40bb. `ranges-data.js` is git-ignored because it comes from paid PokerCoaching charts and this repo is public.
+The app reads ranges from `ranges-data.js`, which is extracted from paid PokerCoaching charts. Keep this repo private while that file is committed. Without the file, the app uses simplified built-in ranges at about 40bb.
 
 To rebuild it from the PokerCoaching "Preflop Ranges" PDF (needs `poppler-utils`, Pillow and numpy):
 
