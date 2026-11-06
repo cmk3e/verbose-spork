@@ -83,11 +83,12 @@
     return [...out.values()];
   }
 
+  // Fallback ranges, used only when ranges-data.js (the chart data) is not loaded.
   // Simplified 8-max MTT ranges (~40bb, BB ante, 2.2bb opens; SB opens 3bb).
   // Calling ranges exclude the hands that would usually 3-bet.
   const RANGES = {
     UTG_open: '66+,A9s+,A5s-A4s,KTs+,QTs+,JTs,T9s,98s,AJo+,KQo',
-    MP_open: '55+,A8s+,A5s-A3s,K9s+,Q9s+,J9s+,T9s,98s,87s,ATo+,KJo+',
+    'UTG+1_open': '55+,A8s+,A5s-A3s,K9s+,Q9s+,J9s+,T9s,98s,87s,ATo+,KJo+',
     LJ_open: '44+,A7s+,A5s-A2s,K9s+,Q9s+,J9s+,T8s+,98s,87s,76s,ATo+,KJo+,QJo',
     HJ_open: '33+,A2s+,K8s+,Q9s+,J8s+,T8s+,97s+,87s,76s,65s,A9o+,KTo+,QJo',
     CO_open: '22+,A2s+,K5s+,Q7s+,J8s+,T7s+,97s+,86s+,75s+,65s,54s,A7o+,A5o,KTo+,QTo+,JTo',
@@ -102,27 +103,90 @@
     BTN_vs_CO: '22-TT,A7s-AJs,A5s-A2s,K9s+,Q9s+,J9s+,T8s+,98s,87s,76s,65s,ATo-AJo,KJo+,QJo',
   };
 
-  const SPOTS = [
-    { pfr: 'UTG', caller: 'BB', pfrRange: 'UTG_open', callerRange: 'BB_vs_EP' },
-    { pfr: 'MP', caller: 'BB', pfrRange: 'MP_open', callerRange: 'BB_vs_EP' },
-    { pfr: 'LJ', caller: 'BB', pfrRange: 'LJ_open', callerRange: 'BB_vs_MP' },
-    { pfr: 'HJ', caller: 'BB', pfrRange: 'HJ_open', callerRange: 'BB_vs_MP' },
-    { pfr: 'CO', caller: 'BB', pfrRange: 'CO_open', callerRange: 'BB_vs_LP' },
-    { pfr: 'BTN', caller: 'BB', pfrRange: 'BTN_open', callerRange: 'BB_vs_LP' },
-    { pfr: 'SB', caller: 'BB', pfrRange: 'SB_open', callerRange: 'BB_vs_SB' },
-    { pfr: 'UTG', caller: 'BTN', pfrRange: 'UTG_open', callerRange: 'BTN_vs_EP' },
-    { pfr: 'HJ', caller: 'BTN', pfrRange: 'HJ_open', callerRange: 'BTN_vs_MP' },
-    { pfr: 'CO', caller: 'BTN', pfrRange: 'CO_open', callerRange: 'BTN_vs_CO' },
+  const FALLBACK_SPOTS = [
+    ['UTG', 'BB', 'UTG_open', 'BB_vs_EP'], ['UTG+1', 'BB', 'UTG+1_open', 'BB_vs_EP'],
+    ['LJ', 'BB', 'LJ_open', 'BB_vs_MP'], ['HJ', 'BB', 'HJ_open', 'BB_vs_MP'],
+    ['CO', 'BB', 'CO_open', 'BB_vs_LP'], ['BTN', 'BB', 'BTN_open', 'BB_vs_LP'],
+    ['SB', 'BB', 'SB_open', 'BB_vs_SB'], ['UTG', 'BTN', 'UTG_open', 'BTN_vs_EP'],
+    ['HJ', 'BTN', 'HJ_open', 'BTN_vs_MP'], ['CO', 'BTN', 'CO_open', 'BTN_vs_CO'],
   ];
 
   // Postflop action order (first to act → last).
-  const POSTFLOP_ORDER = ['SB', 'BB', 'UTG', 'MP', 'LJ', 'HJ', 'CO', 'BTN'];
-  const PREFLOP_ORDER = ['UTG', 'MP', 'LJ', 'HJ', 'CO', 'BTN', 'SB', 'BB'];
+  const POSTFLOP_ORDER = ['SB', 'BB', 'UTG', 'UTG+1', 'LJ', 'HJ', 'CO', 'BTN'];
+  const PREFLOP_ORDER = ['UTG', 'UTG+1', 'LJ', 'HJ', 'CO', 'BTN', 'SB', 'BB'];
+
+  // Weighted combos: each combo is [card1, card2] with a .w frequency (0–1).
+  const withWeight = (c, w) => { const x = [c[0], c[1]]; x.w = w; return x; };
+  const totalWeight = (combos) => combos.reduce((a, c) => a + c.w, 0);
 
   const parsedCache = {};
   function rangeCombos(name) {
-    if (!parsedCache[name]) parsedCache[name] = parseRange(RANGES[name]);
+    if (!parsedCache[name]) parsedCache[name] = parseRange(RANGES[name]).map((c) => withWeight(c, 1));
     return parsedCache[name];
+  }
+
+  const rangeData = () => root.PF_RANGE_DATA || null;
+
+  /** Decode a 169-character frequency string from ranges-data.js into weighted combos. */
+  function decodeChart(str) {
+    const order = rangeData().order;
+    const out = [];
+    for (let i = 0; i < order.length; i++) {
+      const ch = str[i];
+      const q = ch === 'X' ? 10 : +ch;
+      if (!q) continue;
+      const h = order[i];
+      const r1 = rv(h[0]), r2 = rv(h[1]);
+      const m = new Map();
+      addCombos(m, Math.max(r1, r2), Math.min(r1, r2), h[2] || '');
+      for (const c of m.values()) out.push(withWeight(c, q / 10));
+    }
+    return out;
+  }
+
+  /** Stack depths available from the chart data, deepest first (empty if no data). */
+  function availableDepths() {
+    const d = rangeData();
+    return d ? Object.keys(d.depths).sort((a, b) => b - a) : [];
+  }
+
+  const spotCache = {};
+  /** All single-raised-pot spots for a depth, each with weighted ranges and a frequency weight. */
+  function spotsFor(depth) {
+    const d = rangeData();
+    const key = d && d.depths[depth] ? depth : 'fallback';
+    if (spotCache[key]) return spotCache[key];
+    let spots;
+    if (key === 'fallback') {
+      spots = FALLBACK_SPOTS.map(([pfr, caller, a, b]) => ({
+        pfr, caller, depth: null, open: pfr === 'SB' ? 3 : 2.2,
+        pfrCombos: rangeCombos(a), callerCombos: rangeCombos(b), weight: 1,
+      }));
+    } else {
+      const D = d.depths[depth];
+      spots = [];
+      for (const k of Object.keys(D.call)) {
+        const [caller, pfr] = k.split('>');
+        if (!D.open[pfr]) continue;
+        const pfrCombos = decodeChart(D.open[pfr]);
+        const callerCombos = decodeChart(D.call[k]);
+        if (totalWeight(pfrCombos) < 1 || totalWeight(callerCombos) < 1) continue;
+        // How often the spot comes up: open frequency x flat frequency (square-rooted so
+        // rarer spots still appear now and then).
+        const weight = Math.sqrt(totalWeight(pfrCombos) * totalWeight(callerCombos));
+        spots.push({ pfr, caller, depth, open: pfr === 'SB' ? D.sbOpenSize : D.openSize, pfrCombos, callerCombos, weight });
+      }
+    }
+    spotCache[key] = spots;
+    return spots;
+  }
+
+  function pickWeighted(items, weightOf) {
+    let total = 0;
+    for (const it of items) total += weightOf(it);
+    let x = rand() * total;
+    for (const it of items) { x -= weightOf(it); if (x <= 0) return it; }
+    return items[items.length - 1];
   }
 
   // ---------------------------------------------------------------- evaluator
@@ -394,20 +458,22 @@
     const dead = new Set(board);
     const live = combos.filter((c) => !dead.has(c[0]) && !dead.has(c[1]));
     const t = texture(board);
-    let topHits = 0, nutty = 0;
+    let topHits = 0, nutty = 0, total = 0;
     const tiers = { premium: 0, draw: 0, marginal: 0, air: 0 };
     const byTier = { premium: [], draw: [], marginal: [], air: [] };
     for (const h of live) {
-      if (rOf(h[0]) === t.top || rOf(h[1]) === t.top) topHits++;
+      const w = h.w == null ? 1 : h.w;
+      total += w;
+      if (rOf(h[0]) === t.top || rOf(h[1]) === t.top) topHits += w;
       const cl = classify(h, board);
-      if (cl.nutty) nutty++;
-      tiers[cl.tier]++;
+      if (cl.nutty) nutty += w;
+      tiers[cl.tier] += w;
       byTier[cl.tier].push(h);
     }
-    const n = live.length || 1;
+    const n = total || 1;
     return {
       live, byTier,
-      combos: live.length,
+      combos: total,
       topFrac: topHits / n,
       nuttyFrac: nutty / n,
       tierFrac: { premium: tiers.premium / n, draw: tiers.draw / n, marginal: tiers.marginal / n, air: tiers.air / n },
@@ -422,8 +488,9 @@
   function nutStats(a, b, board, band) {
     band = band || 0.05;
     const rows = [];
-    for (const h of a) rows.push({ h, v: evaluate(h.concat(board)), w: 1 / a.length, side: 0 });
-    for (const h of b) rows.push({ h, v: evaluate(h.concat(board)), w: 1 / b.length, side: 1 });
+    const wa = totalWeight(a), wb = totalWeight(b);
+    for (const h of a) rows.push({ h, v: evaluate([h[0], h[1]].concat(board)), w: h.w / wa, side: 0 });
+    for (const h of b) rows.push({ h, v: evaluate([h[0], h[1]].concat(board)), w: h.w / wb, side: 1 });
     rows.sort((x, y) => y.v - x.v);
     let acc = 0, threshold = rows[0].v, cutRow = rows[0];
     for (const r of rows) {
@@ -434,9 +501,9 @@
     let ia = 0, ib = 0;
     for (const r of rows) {
       if (r.v < threshold) break;
-      if (r.side === 0) ia++; else ib++;
+      if (r.side === 0) ia += r.w; else ib += r.w;
     }
-    return { aFrac: ia / a.length, bFrac: ib / b.length, cutLabel: classify(cutRow.h, board).label };
+    return { aFrac: ia, bFrac: ib, cutLabel: classify(cutRow.h, board).label };
   }
 
   /** Monte Carlo equity of range A vs range B on a flop (runs out turn + river). */
@@ -445,12 +512,24 @@
     const dead = new Set(board);
     const deck = [];
     for (let c = 0; c < 52; c++) if (!dead.has(c)) deck.push(c);
+    const sampler = (arr) => {
+      const cum = new Float64Array(arr.length);
+      let t = 0;
+      for (let i = 0; i < arr.length; i++) { t += arr[i].w == null ? 1 : arr[i].w; cum[i] = t; }
+      return () => {
+        const x = rand() * t;
+        let lo = 0, hi = arr.length - 1;
+        while (lo < hi) { const mid = (lo + hi) >> 1; if (cum[mid] < x) lo = mid + 1; else hi = mid; }
+        return arr[lo];
+      };
+    };
+    const drawA = sampler(a), drawB = sampler(b);
     let wins = 0, ties = 0, n = 0, guard = 0;
     const ca = new Array(7), cb = new Array(7);
     ca[2] = cb[2] = board[0]; ca[3] = cb[3] = board[1]; ca[4] = cb[4] = board[2];
     while (n < iters && guard < iters * 5) {
       guard++;
-      const ha = a[randInt(a.length)], hb = b[randInt(b.length)];
+      const ha = drawA(), hb = drawB();
       if (ha[0] === hb[0] || ha[0] === hb[1] || ha[1] === hb[0] || ha[1] === hb[1]) continue;
       let t1, t2;
       do { t1 = deck[randInt(deck.length)]; } while (t1 === ha[0] || t1 === ha[1] || t1 === hb[0] || t1 === hb[1]);
@@ -471,7 +550,7 @@
   const pct = (x) => (x * 100).toFixed(x < 0.1 ? 1 : 0) + '%';
 
   function potSize(spot) {
-    const open = spot.pfr === 'SB' ? 3 : 2.2;
+    const open = spot.open;
     let dead = 1; // BB ante
     if (spot.pfr !== 'SB' && spot.caller !== 'SB') dead += 0.5;
     if (spot.pfr !== 'BB' && spot.caller !== 'BB') dead += 1;
@@ -481,25 +560,29 @@
   /**
    * Build a full drill scenario.
    * opts.role: 'any' | 'pfr' | 'caller'
+   * opts.depth: '80' | '50' | '30' | '20' | 'any' (needs ranges-data.js)
    */
   function generateScenario(opts) {
     opts = opts || {};
     const role = opts.role && opts.role !== 'any' ? opts.role : pick(['pfr', 'caller']);
-    const spot = pick(SPOTS);
+    const depths = availableDepths();
+    const depth = opts.depth && opts.depth !== 'any' && depths.includes(String(opts.depth)) ? String(opts.depth) : (depths.length ? pick(depths) : null);
+    const spot = pickWeighted(spotsFor(depth), (s) => s.weight);
     const deck = [];
     for (let c = 0; c < 52; c++) deck.push(c);
     for (let i = deck.length - 1; i > 0; i--) { const j = randInt(i + 1); [deck[i], deck[j]] = [deck[j], deck[i]]; }
     const board = deck.slice(0, 3).sort((x, y) => rOf(y) - rOf(x));
 
-    const pfrStats = rangeStats(rangeCombos(spot.pfrRange), board);
-    const callerStats = rangeStats(rangeCombos(spot.callerRange), board);
+    const pfrStats = rangeStats(spot.pfrCombos, board);
+    const callerStats = rangeStats(spot.callerCombos, board);
     const heroStats = role === 'pfr' ? pfrStats : callerStats;
     const villStats = role === 'pfr' ? callerStats : pfrStats;
 
     // Pick hero's hand: choose a strength tier evenly so every category gets practice.
     const tiersAvail = Object.keys(heroStats.byTier).filter((k) => heroStats.byTier[k].length);
     const tier = opts.tier && heroStats.byTier[opts.tier] && heroStats.byTier[opts.tier].length ? opts.tier : pick(tiersAvail);
-    const hole = pick(heroStats.byTier[tier]).slice().sort((x, y) => rOf(y) - rOf(x) || sOf(x) - sOf(y));
+    const holeCombo = pickWeighted(heroStats.byTier[tier], (c) => c.w);
+    const hole = [holeCombo[0], holeCombo[1]].sort((x, y) => rOf(y) - rOf(x) || sOf(x) - sOf(y));
 
     const heroPos = role === 'pfr' ? spot.pfr : spot.caller;
     const villPos = role === 'pfr' ? spot.caller : spot.pfr;
@@ -514,7 +597,7 @@
     const { open, pot } = potSize(spot);
 
     const scenario = {
-      spot, role, heroPos, villPos, heroIP, board, hole, pot, open,
+      spot, role, depth, rangeSource: depth ? 'charts' : 'built-in', heroPos, villPos, heroIP, board, hole, pot, open,
       texture: tex, hand, heroEquity,
       nutCut: nuts.cutLabel,
       hero: { topFrac: heroStats.topFrac, nuttyFrac: nuts.aFrac, tierFrac: heroStats.tierFrac, combos: heroStats.combos },
@@ -674,10 +757,10 @@
   }
 
   const api = {
-    RANKS, SUITS, RANGES, SPOTS, TIERS, QUESTION_IDS, POSTFLOP_ORDER, PREFLOP_ORDER,
+    RANKS, SUITS, RANGES, TIERS, QUESTION_IDS, POSTFLOP_ORDER, PREFLOP_ORDER,
     cardId, rOf, sOf, cardStr, parseCard, rankChar,
     parseRange, rangeCombos, evaluate, catOf, texture, describeBoard, classify,
-    rangeStats, rangeEquity, nutStats, generateScenario, isCorrect, setSeed,
+    rangeStats, rangeEquity, nutStats, availableDepths, spotsFor, generateScenario, isCorrect, setSeed,
   };
   root.PFEngine = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

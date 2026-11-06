@@ -22,7 +22,7 @@
   };
 
   const state = {
-    settings: Object.assign({ role: 'any', questions: E.QUESTION_IDS.slice() }, store.get('settings', {})),
+    settings: Object.assign({ role: 'any', depth: 'any', questions: E.QUESTION_IDS.slice() }, store.get('settings', {})),
     stats: store.get('stats', {}),
     session: { right: 0, total: 0, streak: 0, hands: 0 },
     scenario: null,
@@ -49,7 +49,7 @@
 
   // ------------------------------------------------------------ dealing
   function deal() {
-    state.scenario = E.generateScenario({ role: state.settings.role });
+    state.scenario = E.generateScenario({ role: state.settings.role, depth: state.settings.depth });
     state.qIndex = 0;
     state.answers = {};
     state.session.hands++;
@@ -67,6 +67,7 @@
     $('#pot').textContent = s.pot + 'bb';
     $('#role').textContent = s.role === 'pfr' ? 'Preflop raiser' : 'Preflop caller';
     $('#seat').textContent = s.heroPos + ' vs ' + s.villPos;
+    $('#depthChip').textContent = s.depth ? s.depth + 'bb deep' : '~40bb deep';
 
     const board = $('#board');
     board.innerHTML = '';
@@ -207,6 +208,23 @@
       lab.appendChild(el('span', null, QUESTION_META[id]));
       box.appendChild(lab);
     });
+    const depths = E.availableDepths();
+    $('#depthSet').hidden = !depths.length;
+    const dbox = $('#depthToggles');
+    if (depths.length && !dbox.children.length) {
+      ['any'].concat(depths).forEach((d) => {
+        const lab = el('label', 'tog');
+        lab.innerHTML = `<input type="radio" name="depth" id="depth-${d}" value="${d}"><span>${d === 'any' ? 'Mixed' : d + 'bb'}</span>`;
+        dbox.appendChild(lab);
+      });
+    }
+    document.querySelectorAll('input[name="depth"]').forEach((r) => {
+      r.checked = r.value === state.settings.depth;
+      r.onchange = () => { state.settings.depth = r.value; store.set('settings', state.settings); };
+    });
+    $('#rangeSource').textContent = depths.length
+      ? 'Ranges come from your PokerCoaching preflop charts (80, 50, 30 and 20bb). Mixed-frequency hands count in proportion to how often the chart plays them.'
+      : 'Ranges are simplified built-in 8-max MTT ranges at about 40bb.';
     document.querySelectorAll('input[name="role"]').forEach((r) => {
       r.checked = r.value === state.settings.role;
       r.addEventListener('change', () => { state.settings.role = r.value; store.set('settings', state.settings); });

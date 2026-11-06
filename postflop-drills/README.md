@@ -20,12 +20,28 @@ cd postflop-drills && python3 -m http.server 8000
 
 Tests (Node 18+): `node test/engine.test.js`
 
+## Using your own preflop charts
+
+The app reads ranges from `ranges-data.js` when that file exists. Without it, the app uses simplified built-in ranges at about 40bb. `ranges-data.js` is git-ignored because it comes from paid PokerCoaching charts and this repo is public.
+
+To rebuild it from the PokerCoaching "Preflop Ranges" PDF (needs `poppler-utils`, Pillow and numpy):
+
+```
+mkdir -p work/img && cp Preflop_Ranges.pdf work/r.pdf
+pdfimages -png -p work/r.pdf work/img/i
+python3 tools/extract_charts.py work          # reads every 13x13 grid by colour -> work/charts.json
+python3 tools/summarize_charts.py work/charts.json RFI   # check: totals should match each chart's header %
+python3 tools/build_ranges_data.py work/charts.json ranges-data.js
+```
+
+It uses the raise-first-in charts (opening ranges) and the "X vs Y · RFI" charts (flat-call frequencies) at 80, 50, 30 and 20bb. Mixed-frequency hands are weighted by their frequency, to the nearest 10%.
+
 ## How answers are graded
 
 All logic lives in `engine.js` (no DOM), and the UI is in `app.js`.
 
-- **Spots**: single-raised, heads-up pots from 8-max ranges at about 40bb (2.2bb opens, SB opens 3bb, BB ante). Ten opener/caller pairings. Edit the `RANGES` and `SPOTS` tables to change them.
-- **Position**: postflop order SB, BB, UTG, MP, LJ, HJ, CO, BTN.
+- **Spots**: single-raised, heads-up pots. With chart data there are all 28 opener/caller pairings at each depth. Common spots come up more often (weighted by the square root of open % × call %). Open sizes follow the charts. Without chart data there are 10 built-in spots.
+- **Position**: postflop order SB, BB, UTG, UTG+1, LJ, HJ, CO, BTN.
 - **Top card**: the share of each range holding the top board rank. A side needs 1.2x as much, and at least 2 points more, to be "favored".
 - **Connected**: a straight is already possible, or two non-ace cards are within two ranks of each other.
 - **Static / dynamic**: texture score. Two-tone +1, monotone +2, straight possible +2, adjacent cards +2, one-gap +1, paired −1. 2 or more is dynamic.

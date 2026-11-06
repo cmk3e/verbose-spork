@@ -101,3 +101,30 @@ console.log(n + ' test groups passed');
   show('SB_open', 'BB_vs_SB', '9s9d4c');
   show('UTG_open', 'BTN_vs_EP', 'JhTd3c');
 }
+
+// Chart data (ranges-data.js) — only if the file is present.
+{
+  let ok = true;
+  try { require('../ranges-data.js'); } catch (e) { ok = false; console.log('ranges-data.js not present; skipping chart tests'); }
+  if (ok) {
+    const depths = E.availableDepths();
+    assert.deepStrictEqual(depths, ['80', '50', '30', '20']);
+    const tw = (cs) => cs.reduce((a, c) => a + c.w, 0) / 1326 * 100;
+    const sp = E.spotsFor('80');
+    const utgBB = sp.find((s) => s.pfr === 'UTG' && s.caller === 'BB');
+    console.log('80bb UTG open %', tw(utgBB.pfrCombos).toFixed(2), '(chart 16.20)', 'BB call %', tw(utgBB.callerCombos).toFixed(2), '(parsed 45.55)');
+    assert.ok(Math.abs(tw(utgBB.pfrCombos) - 16.2) < 0.6);
+    console.log('spots per depth', depths.map((d) => d + ':' + E.spotsFor(d).length).join(' '));
+    E.setSeed(3);
+    const seen = {};
+    for (let i = 0; i < 300; i++) {
+      const s = E.generateScenario({ iters: 800 });
+      assert.ok(s.depth);
+      seen[s.spot.pfr + ' v ' + s.spot.caller] = (seen[s.spot.pfr + ' v ' + s.spot.caller] || 0) + 1;
+      for (const q of s.questions) assert.ok(q.options.some((o) => o.value === q.answer));
+    }
+    console.log('spot mix', Object.entries(seen).sort((a, b) => b[1] - a[1]).slice(0, 12).map((x) => x.join('=')).join(', '));
+    const s20 = E.generateScenario({ depth: '20', iters: 500 });
+    assert.strictEqual(s20.depth, '20');
+  }
+}

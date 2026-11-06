@@ -254,7 +254,7 @@ footer { color: var(--muted); font-size: .78rem; max-width: 65ch; }
   <header>
     <div class="brand">
       <h1>Postflop Framework Drills</h1>
-      <p>Seven questions to ask on every MTT flop. Single-raised pots, heads-up, about 40bb deep.</p>
+      <p>Seven questions to ask on every MTT flop. Single-raised pots, heads-up, 20 to 80bb deep.</p>
     </div>
     <div class="scoreboard" aria-live="polite">
       <div><b id="score">0/0</b><span>Correct</span></div>
@@ -265,7 +265,7 @@ footer { color: var(--muted); font-size: .78rem; max-width: 65ch; }
 
   <section class="table" aria-label="Current hand">
     <div class="spotline">
-      <div class="chips"><span class="chip role" id="role">Preflop raiser</span><span class="chip" id="seat">BTN vs BB</span></div>
+      <div class="chips"><span class="chip role" id="role">Preflop raiser</span><span class="chip" id="seat">BTN vs BB</span><span class="chip" id="depthChip">80bb deep</span></div>
       <div class="potline">Pot <span class="num" id="pot">5.9bb</span></div>
     </div>
     <p class="action" id="action">BTN opens to 2.2bb · BB calls</p>
@@ -308,6 +308,10 @@ footer { color: var(--muted); font-size: .78rem; max-width: 65ch; }
         <button class="btn ghost" id="allQs" type="button">All seven</button>
       </div>
     </fieldset>
+    <fieldset id="depthSet" hidden>
+      <legend>Stack depth</legend>
+      <div class="toggles" id="depthToggles"></div>
+    </fieldset>
     <fieldset>
       <legend>My preflop role</legend>
       <div class="toggles">
@@ -326,11 +330,12 @@ footer { color: var(--muted); font-size: .78rem; max-width: 65ch; }
   </details>
 
   <footer>
-    Ranges are simplified 8-max MTT ranges (2.2bb opens, BB ante; hands that usually 3-bet are left out of calling ranges).
+    <span id="rangeSource"></span> All pots assume a 1bb big-blind ante.
     Range advantage comes from a whole-range equity simulation. Nut advantage compares how much of each range is in the strongest 5% of hands on the flop.
     Keyboard: 1–4 to answer, Enter for next.
   </footer>
 </div>
+<script src="ranges-data.js"></script>
 <script src="engine.js"></script>
 <script src="app.js"></script>
 </body>
