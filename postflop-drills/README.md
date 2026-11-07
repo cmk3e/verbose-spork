@@ -4,7 +4,7 @@ Three drills, linked from the top of each page:
 
 - **Flop checklist** (`index.html`): the seven-question postflop thought process below.
 - **Preflop trainer** (`preflop.html`): pick the play from your PokerCoaching charts (opens, facing opens, limps, 3-bets, 4-bets, all-ins at 12–80bb). After each answer it shows the full chart with your hand outlined. Data: `preflop-data.js`.
-- **Solver flop drill** (`solver.html`, pilot): BTN vs BB single-raised pot at 50bb on a set of solved flops. You're BTN after a check, or BB facing a ⅓- or ¾-pot c-bet, and you're graded by EV loss against a GTO solver. Data: `solver-data/`.
+- **Solver flop drill** (`solver.html`): BTN vs BB and HJ vs BB single-raised pots at 50bb, 30 solved flops each. You're the raiser after a check, or BB facing a ⅓- or ¾-pot c-bet, and you're graded by EV loss against a GTO solver. Data: `solver-data/`.
 
 A static web app for drilling a seven-question postflop checklist for MTT no-limit hold'em:
 
@@ -70,13 +70,14 @@ The flop solutions come from [postflop-solver](https://github.com/b-inary/postfl
 git clone https://github.com/b-inary/postflop-solver && cp tools/solver/export_flops.rs postflop-solver/examples/
 cd postflop-solver
 RUSTFLAGS="--cap-lints warn" cargo build --release --no-default-features --features rayon --example export_flops
-# ranges file: line 1 = BTN (in position) range, line 2 = BB range, in solver syntax (e.g. "AKs,AQo:0.5")
+# ranges file: line 1 = raiser (in position) range, line 2 = BB range, in solver syntax (e.g. "AKs,AQo:0.5")
 ./target/release/examples/export_flops ranges.txt 59 478 ../solves Ks7d2c As7d2c ...   # pot/stack in tenths of a bb
-python3 ../tools/pack_solves.py ../solves ../solver-data/btn-bb-50 btn-bb-50 "BTN vs BB, 50bb"
+python3 ../tools/pack_solves.py ../solves ../solver-data/btn-bb-50 btn-bb-50 "BTN vs BB, 50bb" BTN BB
+# then add the spot id to SPOTS at the top of solver.js
 ```
 
 Each flop takes about 3½ minutes on 4 cores and about 3.4GB of memory. The tree is simplified:
-- Flop: BTN bets 33% or 75%, and BB can lead 33%.
+- Flop: the raiser bets 33% or 75%, and BB can lead 33%.
 - Raises are 3x.
 - Turn and river: 66% bets, plus all-in.
 

@@ -3,16 +3,20 @@
 (function () {
   'use strict';
   const E = window.PFEngine;
-  const SPOT_DIR = 'solver-data/btn-bb-50/';
+  // Solved spots; each has solver-data/<id>/index.json. Add new spots here.
+  const SPOTS = [
+    { id: 'btn-bb-50', label: 'BTN vs BB' },
+    { id: 'hj-bb-50', label: 'HJ vs BB' },
+  ];
   const RANKS = 'AKQJT98765432';
   const SUIT_SYM = { s: '♠', h: '♥', d: '♦', c: '♣' };
 
   const NODE_INFO = {
-    x: { hero: 'BTN', label: 'BB checks to you', type: 'ipCheck' },
-    'x-b1': { hero: 'BB', label: 'You check, BTN bets small', type: 'vsSmall' },
-    'x-b2': { hero: 'BB', label: 'You check, BTN bets big', type: 'vsBig' },
+    x: { ip: true, type: 'ipCheck' },
+    'x-b1': { ip: false, type: 'vsSmall' },
+    'x-b2': { ip: false, type: 'vsBig' },
   };
-  const TYPES = { ipCheck: 'BTN: c-bet or check back', vsSmall: 'BB: facing a ⅓-pot bet', vsBig: 'BB: facing a ¾-pot bet' };
+  const TYPES = { ipCheck: 'Raiser: c-bet or check back', vsSmall: 'BB: facing a ⅓-pot bet', vsBig: 'BB: facing a ¾-pot bet' };
 
   const store = {
     get(k, d) { try { const v = localStorage.getItem('psd:' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
@@ -23,13 +27,19 @@
   const rand = (n) => Math.floor(Math.random() * n);
 
   const state = {
-    index: null, cache: {}, flop: null, nodeName: null, node: null, combo: null, answered: false,
-    settings: Object.assign({ types: Object.keys(TYPES) }, store.get('settings', {})),
-    stats: store.get('stats', {}),
+    indexes: {}, index: null, cache: {}, flop: null, nodeName: null, node: null, combo: null, answered: false,
+    settings: Object.assign({ types: Object.keys(TYPES), spots: SPOTS.map((x) => x.id) }, store.get('settings', {})),
+    stats: migrateStats(store.get('stats', {})),
     session: { right: 0, total: 0, streak: 0, hands: 0, evLoss: 0 },
   };
 
   // ------------------------------------------------------------ helpers
+  // stats are kept per spot and node type ("btn-bb-50:vsSmall"); older saves had type only
+  function migrateStats(st) {
+    const out = {};
+    for (const [k, v] of Object.entries(st)) out[k.includes(':') ? k : SPOTS[0].id + ':' + k] = v;
+    return out;
+  }
   const fmt = (x) => (Math.round(x * 100) / 100).toFixed(2);
   function handClass(combo) {
     const r1 = combo[0], s1 = combo[1], r2 = combo[2], s2 = combo[3];
@@ -61,17 +71,22 @@
     if (!r.ok) throw new Error(path + ': ' + r.status);
     return r.json();
   }
-  async function loadFlop(f) {
-    if (!state.cache[f]) state.cache[f] = await loadJSON(SPOT_DIR + f + '.json');
-    return state.cache[f];
+  async function loadFlop(spot, f) {
+    const key = spot + '/' + f;
+    if (!state.cache[key]) state.cache[key] = await loadJSON('solver-data/' + key + '.json');
+    return state.cache[key];
   }
+  const loadedSpots = () => SPOTS.filter((x) => state.indexes[x.id]);
 
   // ------------------------------------------------------------ deal
   async function deal() {
     const types = state.settings.types.length ? state.settings.types : Object.keys(TYPES);
     const names = Object.keys(NODE_INFO).filter((n) => types.includes(NODE_INFO[n].type));
-    const flopName = state.index.flops[rand(state.index.flops.length)];
-    const flop = await loadFlop(flopName);
+    const avSpots = loadedSpots().filter((x) => state.settings.spots.includes(x.id));
+    const spot = (avSpots.length ? avSpots : loadedSpots())[rand(avSpots.length || loadedSpots().length)];
+    const index = state.indexes[spot.id];
+    const flopName = index.flops[rand(index.flops.length)];
+    const flop = await loadFlop(spot.id, flopName);
     const avail = names.filter((n) => flop.nodes[n]);
     const nodeName = avail[rand(avail.length)];
     const node = flop.nodes[nodeName];
@@ -81,7 +96,7 @@
     for (const [, v] of entries) total += v[0];
     let x = Math.random() * total, combo = entries[0][0];
     for (const [c, v] of entries) { x -= v[0]; if (x <= 0) { combo = c; break; } }
-    Object.assign(state, { flop, nodeName, node, combo, answered: false });
+    Object.assign(state, { index, flop, nodeName, node, combo, answered: false });
     state.session.hands++;
     render();
   }
@@ -90,14 +105,16 @@
   function render() {
     const { flop, node, nodeName, combo } = state;
     const info = NODE_INFO[nodeName];
-    $('#typeChip').textContent = info.hero === 'BTN' ? 'You: BTN (in position)' : 'You: BB (out of position)';
-    $('#depthChip').textContent = '50bb deep';
+    const { ip, oop } = state.index;
+    $('#spotChip').textContent = `${ip} vs ${oop}`;
+    $('#typeChip').textContent = info.ip ? `You: ${ip} (in position)` : `You: ${oop} (out of position)`;
+    $('#depthChip').textContent = Math.round(flop.stack + 2.2) + 'bb deep';
     $('#pot').textContent = node.pot.toFixed(1) + 'bb';
-    const preflop = info.hero === 'BTN' ? '<b>You (BTN)</b> open 2.2bb, BB calls.' : 'BTN opens 2.2bb, <b>you (BB)</b> call.';
-    let line = info.label + '.';
+    const preflop = info.ip ? `<b>You (${ip})</b> open 2.2bb, ${oop} calls.` : `${ip} opens 2.2bb, <b>you (${oop})</b> call.`;
+    let line = `${oop} checks to you.`;
     if (nodeName !== 'x') {
       const bet = state.flop.nodes.x.actions[nodeName === 'x-b1' ? 1 : 2];
-      line = `You check, BTN ${actionText(bet, flop.pot).replace('Bet', 'bets')}.`;
+      line = `You check, ${ip} ${actionText(bet, flop.pot).replace('Bet', 'bets')}.`;
     }
     $('#action').innerHTML = `${preflop} Flop: ${line}`;
     const board = $('#board');
@@ -141,7 +158,7 @@
     const ss = state.session;
     ss.total++; ss.evLoss += loss;
     if (ok) { ss.right++; ss.streak++; } else ss.streak = 0;
-    const type = NODE_INFO[nodeName].type;
+    const type = state.index.id + ':' + NODE_INFO[nodeName].type;
     const st = state.stats[type] || { right: 0, total: 0, loss: 0 };
     st.total++; st.loss += loss; if (ok) st.right++;
     state.stats[type] = st;
@@ -213,7 +230,7 @@
     node.actions.forEach((a, j) => {
       legend.appendChild(el('span', 'lg', `<i style="background:${color(j)}"></i>${actionText(a, node.pot)} <b class="num">${Math.round(tot[j] / W)}%</b>`));
     });
-    $('#chartTitle').textContent = `Solver strategy for the whole ${NODE_INFO[state.nodeName].hero} range on ${state.flop.flop}`;
+    $('#chartTitle').textContent = `Solver strategy for the whole ${NODE_INFO[state.nodeName].ip ? state.index.ip : state.index.oop} range on ${state.flop.flop}`;
     $('#chartWrap').hidden = false;
   }
 
@@ -225,6 +242,21 @@
   }
 
   function renderSettings() {
+    const sbox = $('#spotToggles');
+    sbox.innerHTML = '';
+    loadedSpots().forEach((sp) => {
+      const lab = el('label', 'tog', `<input type="checkbox"><span>${sp.label}</span>`);
+      sbox.appendChild(lab);
+      const cb = lab.querySelector('input');
+      cb.checked = state.settings.spots.includes(sp.id);
+      cb.onchange = () => {
+        const set = new Set(state.settings.spots);
+        cb.checked ? set.add(sp.id) : set.delete(sp.id);
+        if (!SPOTS.some((x) => set.has(x.id) && state.indexes[x.id])) { cb.checked = true; return; }
+        state.settings.spots = SPOTS.map((x) => x.id).filter((x) => set.has(x));
+        store.set('settings', state.settings);
+      };
+    });
     const tbox = $('#typeToggles');
     tbox.innerHTML = '';
     Object.keys(TYPES).forEach((t) => {
@@ -245,15 +277,16 @@
   function renderStats() {
     const tb = $('#statsBody');
     tb.innerHTML = '';
-    Object.keys(TYPES).forEach((t) => {
-      const st = state.stats[t] || { right: 0, total: 0, loss: 0 };
+    loadedSpots().forEach((sp) => Object.keys(TYPES).forEach((t) => {
+      const st = state.stats[sp.id + ':' + t] || { right: 0, total: 0, loss: 0 };
       const p = st.total ? Math.round((st.right / st.total) * 100) : null;
       const tr = el('tr');
-      tr.innerHTML = `<td>${TYPES[t]}</td><td class="num">${st.right}/${st.total}</td>
+      const ip = state.indexes[sp.id].ip;
+      tr.innerHTML = `<td>${sp.label} · ${TYPES[t].replace('Raiser', ip)}</td><td class="num">${st.right}/${st.total}</td>
         <td class="num">${st.total ? fmt(st.loss / st.total) + 'bb' : '–'}</td>
         <td class="barcell"><div class="bar"><i style="width:${p || 0}%"></i></div><span class="num">${p == null ? '–' : p + '%'}</span></td>`;
       tb.appendChild(tr);
-    });
+    }));
   }
 
   async function init() {
@@ -270,10 +303,14 @@
         e.preventDefault(); deal();
       }
     });
+    await Promise.all(SPOTS.map((sp) => loadJSON('solver-data/' + sp.id + '/index.json')
+      .then((ix) => { state.indexes[sp.id] = ix; }).catch(() => {})));
     renderSettings();
     try {
-      state.index = await loadJSON(SPOT_DIR + 'index.json');
-      $('#flopCount').textContent = state.index.flops.length;
+      const ls = loadedSpots();
+      if (!ls.length) throw new Error('no spots');
+      $('#spotList').textContent = ls.map((x) => x.label).join(' and ');
+      $('#flopCount').textContent = ls.reduce((n, x) => n + state.indexes[x.id].flops.length, 0);
       await deal();
     } catch (err) {
       $('#action').textContent = 'Could not load the solver data. Open this page from the website (not a saved file) and refresh.';

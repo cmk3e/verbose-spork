@@ -20,7 +20,7 @@
   <header>
     <div class="brand">
       <h1>Solver Flop Drill</h1>
-      <p>Pilot: BTN vs BB single-raised pot, 50bb, <span id="flopCount">30</span> solved flops. Graded by EV against a GTO solver.</p>
+      <p><span id="spotList">BTN vs BB</span> single-raised pots, 50bb, <span id="flopCount">30</span> solved flops. Graded by EV against a GTO solver.</p>
     </div>
     <div class="scoreboard" aria-live="polite">
       <div><b id="score">0/0</b><span>Correct</span></div>
@@ -31,7 +31,7 @@
 
   <section class="table" aria-label="Current hand">
     <div class="spotline">
-      <div class="chips"><span class="chip role" id="typeChip">You: BTN</span><span class="chip" id="depthChip">50bb deep</span></div>
+      <div class="chips"><span class="chip role" id="typeChip">You: BTN</span><span class="chip" id="spotChip">BTN vs BB</span><span class="chip" id="depthChip">50bb deep</span></div>
       <div class="potline">Pot <span class="num" id="pot">5.9bb</span></div>
     </div>
     <p class="action" id="action">Loading solver data…</p>
@@ -68,7 +68,11 @@
   <details class="panel" id="settings">
     <summary>Drill settings</summary>
     <fieldset>
-      <legend>Spots to drill</legend>
+      <legend>Positions</legend>
+      <div class="toggles" id="spotToggles"></div>
+    </fieldset>
+    <fieldset>
+      <legend>Decisions to drill</legend>
       <div class="toggles" id="typeToggles"></div>
     </fieldset>
     <div class="btnrow"><button class="btn ghost" id="deal" type="button">Deal a new hand now</button></div>
@@ -81,8 +85,8 @@
   </details>
 
   <footer>
-    Solutions from the open-source postflop-solver (AGPL-3.0) with your PokerCoaching 50bb ranges: BTN opens 2.2bb, BB calls, 5.9bb pot, 47.8bb behind.
-    Simplified bet sizes: BTN bets 33% or 75% on the flop, BB can lead 33%; raises are 3x; turn and river use 66% and all-in. Solved to about 0.5% of the pot.
+    Solutions from the open-source postflop-solver (AGPL-3.0) with your PokerCoaching 50bb ranges: the raiser opens 2.2bb, BB calls, 5.9bb pot, 47.8bb behind.
+    Simplified bet sizes: the raiser bets 33% or 75% on the flop, BB can lead 33%; raises are 3x; turn and river use 66% and all-in. Solved to about 0.5% of the pot.
     Grading: Best = the solver's main play or within 0.05bb; Good = a mixed play or within 2% of the pot; then Inaccuracy (up to 6%), Mistake (up to 15%) and Blunder.
   </footer>
 </div>
