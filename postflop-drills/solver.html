@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Solver Flop Drill</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=IBM+Plex+Mono:wght@500&family=Public+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap">
+  <nav class="nav" aria-label="Drills">
+    <a href="index.html">Flop checklist</a>
+    <a href="preflop.html">Preflop trainer</a>
+    <a href="solver.html" aria-current="page">Solver flop drill</a>
+  </nav>
+  <header>
+    <div class="brand">
+      <h1>Solver Flop Drill</h1>
+      <p>Pilot: BTN vs BB single-raised pot, 50bb, <span id="flopCount">30</span> solved flops. Graded by EV against a GTO solver.</p>
+    </div>
+    <div class="scoreboard" aria-live="polite">
+      <div><b id="score">0/0</b><span>Correct</span></div>
+      <div><b id="streak">0</b><span>Streak</span></div>
+      <div><b id="evloss">0.00</b><span>bb lost / hand</span></div>
+    </div>
+  </header>
+
+  <section class="table" aria-label="Current hand">
+    <div class="spotline">
+      <div class="chips"><span class="chip role" id="typeChip">You: BTN</span><span class="chip" id="depthChip">50bb deep</span></div>
+      <div class="potline">Pot <span class="num" id="pot">5.9bb</span></div>
+    </div>
+    <p class="action" id="action">Loading solver data…</p>
+    <div class="felt-row">
+      <div class="felt-group"><span>Flop</span><div class="cards" id="board"></div></div>
+      <div class="felt-group"><span>Your hand</span><div class="cards" id="hole"></div></div>
+    </div>
+    <p class="action" id="texture"></p>
+  </section>
+
+  <section class="panel" aria-live="polite">
+    <div class="eyebrow">Your play</div>
+    <div class="options" id="options"></div>
+    <div class="feedback" id="feedback" hidden>
+      <p class="verdict" id="verdict"></p>
+      <p class="explain" id="explain"></p>
+      <div class="gridwrap">
+        <table class="stats evtable">
+          <thead><tr><th>Action</th><th class="num">Solver</th><th class="num">EV</th><th class="num">vs best</th></tr></thead>
+          <tbody id="handTable"></tbody>
+        </table>
+      </div>
+      <button class="btn" id="next" type="button">Next hand</button>
+    </div>
+  </section>
+
+  <section class="panel" id="chartWrap" hidden>
+    <div class="eyebrow" id="chartTitle">Range strategy</div>
+    <div class="legendrow" id="gridLegend"></div>
+    <div class="gridwrap"><div class="grid" id="grid"></div></div>
+    <p class="note">Your hand's class is outlined. Each cell blends every suit combination of that hand, weighted by how often it reaches this spot.</p>
+  </section>
+
+  <details class="panel" id="settings">
+    <summary>Drill settings</summary>
+    <fieldset>
+      <legend>Spots to drill</legend>
+      <div class="toggles" id="typeToggles"></div>
+    </fieldset>
+    <div class="btnrow"><button class="btn ghost" id="deal" type="button">Deal a new hand now</button></div>
+  </details>
+
+  <details class="panel" id="statsBox">
+    <summary>My accuracy by spot</summary>
+    <table class="stats"><tbody id="statsBody"></tbody></table>
+    <div class="btnrow"><button class="btn ghost" id="resetStats" type="button">Reset accuracy</button></div>
+  </details>
+
+  <footer>
+    Solutions from the open-source postflop-solver (AGPL-3.0) with your PokerCoaching 50bb ranges: BTN opens 2.2bb, BB calls, 5.9bb pot, 47.8bb behind.
+    Simplified bet sizes: BTN bets 33% or 75% on the flop, BB can lead 33%; raises are 3x; turn and river use 66% and all-in. Solved to about 0.5% of the pot.
+    Grading: Best = the solver's main play or within 0.05bb; Good = a mixed play or within 2% of the pot; then Inaccuracy (up to 6%), Mistake (up to 15%) and Blunder.
+  </footer>
+</div>
+<script src="engine.js"></script>
+<script src="solver.js"></script>
+</body>
+</html>

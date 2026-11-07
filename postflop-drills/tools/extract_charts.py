@@ -59,7 +59,7 @@ def parse(path):
             px = a[y, x0 + 2:x1 - 2]
             d = ((px[:, None, :] - pal[None, :, :]) ** 2).sum(2)
             k = d.argmin(1)
-            ok = d.min(1) < 60 ** 2 * 3
+            ok = (d.min(1) < 60 ** 2 * 3) & (px.sum(1) > 110)
             fr = [float(((k == i) & ok).sum()) / max(1, ok.sum()) for i in range(len(pal))]
             cells[hand(ri, ci)] = [round(f, 2) for f in fr]
     return leg, legw, cells
