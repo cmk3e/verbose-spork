@@ -255,6 +255,28 @@
     return score(0, singles.slice(0, 5));
   }
 
+  /**
+   * Count the two-card rank holdings (not pairing the board) that make a straight
+   * or an 8-out straight draw (open-ended or double gutshot) on this flop.
+   */
+  function straightDrawCount(distinct) {
+    const br = new Set(distinct);
+    let draws = 0, made = 0;
+    const examples = [];
+    for (let r2 = 14; r2 >= 2; r2--) {
+      for (let r1 = r2 - 1; r1 >= 2; r1--) {
+        if (br.has(r1) || br.has(r2)) continue;
+        let mask = 0;
+        for (const r of [...br, r1, r2]) mask |= 1 << r;
+        if (straightHigh(mask)) { made++; continue; }
+        let outs = 0;
+        for (let r = 2; r <= 14; r++) if (!(mask & (1 << r)) && straightHigh(mask | (1 << r))) outs++;
+        if (outs >= 2) { draws++; if (examples.length < 3) examples.push(rankChar(r2) + rankChar(r1)); }
+      }
+    }
+    return { draws, made, examples };
+  }
+
   // ---------------------------------------------------------------- board texture
   function texture(board) {
     const ranks = board.map(rOf);
@@ -287,12 +309,17 @@
     const paired = distinct.length < 3;
     const flushDraws = suitTexture !== 'rainbow';
     // Dynamic score: how much the turn and river can change the best hand.
+    const sd = straightDrawCount(distinct);
     const dynFactors = [];
     if (suitTexture === 'monotone') dynFactors.push({ pts: 2, why: 'monotone: flush draws are everywhere and any card of that suit changes who has the flush' });
     else if (suitTexture === 'two-tone') dynFactors.push({ pts: 1, why: 'two-tone, so flush draws exist' });
-    if (straightPossible) dynFactors.push({ pts: 2, why: 'straights are already possible and many turns add more straight draws' });
-    else if (closePair && closePair[0] - closePair[1] === 1) dynFactors.push({ pts: 2, why: 'two adjacent cards give lots of open-ended straight draws' });
-    else if (closePair) dynFactors.push({ pts: 1, why: 'two cards one gap apart allow some straight draws' });
+    if (sd.made) dynFactors.push({ pts: 2, why: 'straights are already possible and many turns add more straight draws' });
+    else if (sd.draws >= 3) dynFactors.push({ pts: 2, why: `${sd.draws} different two-card holdings (like ${sd.examples.join(', ')}) make open-ended or double-gutshot straight draws` });
+    else if (sd.draws >= 1) dynFactors.push({ pts: 1, why: `a few holdings (like ${sd.examples.join(', ')}) make strong straight draws` });
+    if (distinct[0] <= 9) {
+      const overs = (14 - distinct[0]) * 4;
+      dynFactors.push({ pts: 1, why: `it is ${rankChar(distinct[0])}-high, so ${overs} of the 47 unseen cards are overcards that can change who is ahead` });
+    }
     if (paired) dynFactors.push({ pts: -1, why: 'the paired card cuts the number of draws' });
     const dynScore = dynFactors.reduce((a, f) => a + f.pts, 0);
     const dynamic = dynScore >= 2;

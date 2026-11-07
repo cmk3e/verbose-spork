@@ -44,7 +44,7 @@ All logic lives in `engine.js` (no DOM), and the UI is in `app.js`.
 - **Position**: postflop order SB, BB, UTG, UTG+1, LJ, HJ, CO, BTN.
 - **Top card**: the share of each range holding the top board rank. A side needs 1.2x as much, and at least 2 points more, to be "favored".
 - **Connected**: a straight is already possible, or two non-ace cards are within two ranks of each other.
-- **Static / dynamic**: texture score. Two-tone +1, monotone +2, straight possible +2, adjacent cards +2, one-gap +1, paired −1. 2 or more is dynamic.
+- **Static / dynamic**: texture score. Two-tone +1, monotone +2. Straight possible +2. Straight draws: count the two-card holdings that make an open-ended or double-gutshot draw, +2 for three or more, +1 for one or two. 9-high or lower +1 (most turn cards are overcards). Paired −1. 2 or more is dynamic.
 - **Range advantage**: Monte Carlo equity of range vs range to the river (6,000 runouts). 53% or more is an advantage, 47–53% is even.
 - **Nut advantage**: pool both ranges, take the strongest 5% of made hands on the flop, and compare each range's share. One side needs 1.3x as much and at least 1.5 points more.
 - **Hand strength**:

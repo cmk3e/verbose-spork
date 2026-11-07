@@ -56,6 +56,10 @@ t('texture', () => {
   assert.strictEqual(x('Ks7s6d').dynamic, true);
   assert.strictEqual(x('JsTc3d').dynamic, true);
   assert.strictEqual(x('9s9h4h').dynamic, false);
+  assert.strictEqual(x('8d5s2h').dynamic, true);
+  assert.strictEqual(x('Kd7s2h').dynamic, false);
+  assert.strictEqual(x('Qd6s2h').dynamic, false);
+  assert.strictEqual(x('KdQs4h').dynamic, false);
   assert.strictEqual(x('5s3c2d').connected, true);
 });
 
