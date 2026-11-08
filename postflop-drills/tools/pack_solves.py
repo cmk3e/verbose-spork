@@ -21,6 +21,8 @@ for f in sorted(glob.glob(os.path.join(src, '*.json'))):
     nodes = {}
     for name, n in d['nodes'].items():
         k = len(n['actions'])
+        if not n['hands']:
+            continue  # nobody reaches this node (e.g. a bet size that is never used)
         wmax = max(v[0] for v in n['hands'].values()) or 1
         hands = {}
         for combo, v in n['hands'].items():
