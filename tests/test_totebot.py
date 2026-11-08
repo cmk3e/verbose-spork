@@ -1277,3 +1277,26 @@ def test_pdf_race_with_one_horse_is_skipped_not_fatal(tmp_path, monkeypatch):
         body = r.json()
         assert [x["id"][:3] for x in body["races"]] == ["BEL"]
         assert any("Laurel Park R7: only 1 horse read" in s for s in body["skipped"])
+
+
+def test_pick6_page_builds_tickets_from_loaded_and_unloaded_legs(tmp_path):
+    from totebot import pick6
+
+    race = sample_race()           # AQU R5 on the card; R6 only on the tote
+    app = create_app(settings(tmp_path, password="pw"), start_scheduler=False)
+    app.state.scheduler.source = FakeSource()
+    app.state.store.save(race)
+    with TestClient(app) as c:
+        c.auth = ("admin", "pw")
+        page = c.get("/pick6", params={"track": "AQU", "first": 5, "legs": 2, "budget": 2, "base": 0.5}).text
+    assert "R5 (your card)" in page and "R6 (not loaded from PPs: public odds only)" in page
+    assert "Average return per $1 of new money: 1.10" in page
+    assert page.count("Budget $2, horses chosen by") == 2
+
+    legs = [{"horses": [{"num": "1", "p": 0.6, "q": 0.5}, {"num": "2", "p": 0.3, "q": 0.3}, {"num": "3", "p": 0.1, "q": 0.2}]},
+            {"horses": [{"num": "4", "p": 0.9, "q": 0.8}, {"num": "5", "p": 0.1, "q": 0.2}]}]
+    picks = pick6.build_ticket(legs, budget=1.0, base=0.5)
+    assert [[h["num"] for h in p] for p in picks] == [["1", "2"], ["4"]]   # spread where it buys the most hit chance
+    e = pick6.evaluate(picks, 0.5, 1.0)
+    assert e["cost"] == 1.0 and e["hit_model"] == pytest.approx(0.81)
+    assert e["ev"] == pytest.approx(0.5 * (0.6 / 0.5 + 1.0) * (0.9 / 0.8))

@@ -321,6 +321,32 @@ def create_app(settings: Optional[Settings] = None, start_scheduler: bool = True
         return performance.summarize(store.all(), settings.timezone, load_engine(settings.engine_module),
                                       (settings.alpha, settings.beta))
 
+    @app.get("/pick6", include_in_schema=False, dependencies=[Depends(auth)])
+    async def pick6_page(track: str = "GP", first: int = 5, legs: int = 6, budget: float = 100.0, base: float = 0.2,
+                         carryover: float = 150000.0, pool: float = 500000.0, takeout: float = 0.20):
+        """Pick 6 ticket builder: e.g. /pick6?track=GP&first=5&budget=100&carryover=150000&pool=500000"""
+        from . import pick6
+
+        rows, errors = [], []
+        for n in range(first, first + legs):
+            try:
+                rows.append(await pick6.leg(store, scheduler.source, settings, track, n))
+            except Exception as e:
+                errors.append(f"R{n}: {e}")
+        text = "\n".join(errors) + "\n\n" if errors else ""
+        if len(rows) == legs:
+            text += pick6.report(rows, budget, base, carryover, pool, takeout)
+        else:
+            text += "Every leg is needed to build a ticket."
+        return HTMLResponse(
+            '<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pick 6</title>'
+            "<style>body{font-family:-apple-system,system-ui,sans-serif;margin:16px;background:#fff;color:#111}"
+            "@media (prefers-color-scheme:dark){body{background:#111;color:#eee}}"
+            "pre{white-space:pre-wrap;font-size:13px}</style>"
+            f"<p>Odds pulled {utcnow():%H:%M}Z. Reload for fresh odds. Settings are in the address: track, first, legs, "
+            "budget, base, carryover, pool (estimated new money), takeout.</p>"
+            f"<pre>{html.escape(text)}</pre>")
+
     @app.get("/performance", include_in_schema=False, dependencies=[Depends(auth)])
     def performance_html():
         summary = performance.summarize(store.all(), settings.timezone, load_engine(settings.engine_module),
