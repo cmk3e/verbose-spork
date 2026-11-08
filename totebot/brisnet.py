@@ -32,7 +32,8 @@ RACE_TYPES = {"alw", "mdn", "md", "mc", "clm", "oc", "stk", "hcp", "str", "msw",
 SMALL_WORDS = {"at", "the", "of", "de", "la", "a", "big"}
 
 # Long track names are printed over "Comments", so the name can come out glued to it or on the next line.
-HEADER = re.compile(r"Ultimate PP's w/ QuickPlay Comm?e?n?t?s?\s*(?P<rest>[A-Z].+?)\s+"
+# Plain "Ultimate PP's" (no QuickPlay comments) has the same layout.
+HEADER = re.compile(r"Ultimate PP's(?: w/ QuickPlay Comm?e?n?t?s?)?\s*(?P<rest>[A-Z].+?)\s+"
                     r"(?P<date>[A-Z][a-z]+ \d{1,2}, \d{4})\s+Race (?P<race>\d+)\s*$", re.M)
 POST = re.compile(r"Post\s*Time:?\s*\(?\s*(\d{1,2})\s*:\s*(\d{2})")
 TOC_RACE = re.compile(r"^Race (\d+)$")
@@ -199,7 +200,8 @@ def parse_pages(pages: List[str], skipped: Optional[List[str]] = None) -> List[d
         day = datetime.strptime(header.group("date"), "%B %d, %Y").replace(tzinfo=ZoneInfo(BRISNET_TZ))
         card = (name, day)
         rest = header.group("rest")
-        surface = "Trf" if re.search(r"\((?:t|T)\)", rest) else "AW" if re.search(r"\(A\)", rest) else "Fst"
+        surface = ("Trf" if re.search(r"\((?:t|T)\)", rest) else
+                   "AW" if re.search(r"\(A\)", rest) or re.search(r"\((?:All-Weather|Tapeta|Synthetic)\)", text[:3000]) else "Fst")
         race = races.setdefault((name, day, num), {
             "track": TRACK_CODES.get(name.lower(), name), "track_name": name,
             "race_number": num, "runners": [], "pars": {}, "surface": surface,

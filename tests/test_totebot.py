@@ -453,7 +453,7 @@ def test_brisnet_partial_pdf_reports_skipped():
 def test_brisnet_long_track_name_printed_over_header():
     from totebot.brisnet import parse_pages
 
-    for glued in ("Ultimate PP's w/ QuickPlay CommeCentury Downs TB", "Ultimate PP's w/ QuickPlay Comments\nCentury Downs TB",
+    for glued in ("Ultimate PP's Century Downs TB", "Ultimate PP's w/ QuickPlay CommeCentury Downs TB", "Ultimate PP's w/ QuickPlay Comments\nCentury Downs TB",
                   "Ultimate PP's w/ QuickPlay CommentsCentury Downs TB"):
         page = BRISNET_PAGE.replace("Ultimate PP's w/ QuickPlay Comments Belmont Park", glued).format(race=7, post="11:12")
         races = parse_pages([page])
@@ -1300,3 +1300,12 @@ def test_pick6_page_builds_tickets_from_loaded_and_unloaded_legs(tmp_path):
     e = pick6.evaluate(picks, 0.5, 1.0)
     assert e["cost"] == 1.0 and e["hit_model"] == pytest.approx(0.81)
     assert e["ev"] == pytest.approx(0.5 * (0.6 / 0.5 + 1.0) * (0.9 / 0.8))
+
+
+def test_brisnet_plain_ultimate_pp_and_all_weather():
+    from totebot.brisnet import parse_pages
+
+    page = BRISNET_PAGE.replace("Ultimate PP's w/ QuickPlay Comments", "Ultimate PP's").replace(" (t)", "").replace(
+        "Post Time:", "1m70yds. (All-Weather) OClm 12500 Purse $27,000\nPost Time:").format(race=6, post="3:03")
+    race = parse_pages([page])[0]
+    assert (race["track"], race["race_number"], race["surface"], len(race["runners"])) == ("BEL", 6, "AW", 3)
