@@ -5,10 +5,25 @@
   const E = window.PFEngine;
   // Solved spots; each has solver-data/<id>/index.json. Add new spots here.
   const SPOTS = [
-    { id: 'btn-bb-50', label: 'BTN vs BB', raiser: 'BTN', caller: 'BB', open: 2.2 },
-    { id: 'hj-bb-50', label: 'HJ vs BB', raiser: 'HJ', caller: 'BB', open: 2.2 },
-    { id: 'sb-bb-50', label: 'BB vs SB', raiser: 'SB', caller: 'BB', open: 3.5 },
+    { id: 'btn-bb-50', name: 'BTN vs BB', depth: 50, raiser: 'BTN', caller: 'BB', open: 2.2 },
+    { id: 'btn-bb-30', name: 'BTN vs BB', depth: 30, raiser: 'BTN', caller: 'BB', open: 2.3 },
+    { id: 'btn-bb-20', name: 'BTN vs BB', depth: 20, raiser: 'BTN', caller: 'BB', open: 2 },
+    { id: 'hj-bb-50', name: 'HJ vs BB', depth: 50, raiser: 'HJ', caller: 'BB', open: 2.2 },
+    { id: 'sb-bb-50', name: 'BB vs SB', depth: 50, raiser: 'SB', caller: 'BB', open: 3.5 },
   ];
+  SPOTS.forEach((sp) => { sp.label = `${sp.name} ${sp.depth}bb`; });
+
+  // Preflop frequency (0-1) of a hand class for the hero's preflop action in this spot,
+  // from the chart data (ranges-data.js). Null when the chart is unavailable.
+  function preflopFreq(sp, heroIsRaiser, cls) {
+    const D = window.PF_RANGE_DATA;
+    const d = D && D.depths[String(sp.depth)];
+    if (!d) return null;
+    const str = heroIsRaiser ? d.open[sp.raiser] : d.call[sp.caller + '>' + sp.raiser];
+    const i = D.order.indexOf(cls);
+    if (!str || i < 0) return null;
+    return str[i] === 'X' ? 1 : +str[i] / 10;
+  }
   const RANKS = 'AKQJT98765432';
   const SUIT_SYM = { s: '♠', h: '♥', d: '♦', c: '♣' };
 
@@ -56,8 +71,10 @@
       out.types = out.types.map((t) => (t === 'ipCheck' ? 'cbet' : t)).concat(['stab']);
       out.spots = Array.from(new Set(out.spots.concat(['sb-bb-50'])));
     }
+    if ((s.v || 1) < 3) out.spots = Array.from(new Set(out.spots.concat(['btn-bb-30', 'btn-bb-20'])));
+    if (out.mainOnly == null) out.mainOnly = false;
     out.types = Object.keys(TYPES).filter((t) => out.types.includes(t));
-    out.v = 2;
+    out.v = 3;
     return out;
   }
   const fmt = (x) => (Math.round(x * 100) / 100).toFixed(2);
@@ -113,8 +130,14 @@
     if (!avail.length) avail = Object.keys(drillNodes(spot, index)).filter((n) => flop.nodes[n]);
     const nodeName = avail[rand(avail.length)];
     const node = flop.nodes[nodeName];
-    // deal a combo in proportion to how often it reaches this spot
-    const entries = Object.entries(node.hands);
+    // deal a combo in proportion to how often it reaches this spot; optionally only hands
+    // the hero's preflop chart plays at least half the time
+    let entries = Object.entries(node.hands);
+    if (state.settings.mainOnly) {
+      const heroIsRaiser = (node.player === 'IP' ? index.ip : index.oop) === spot.raiser;
+      const main = entries.filter(([c]) => { const f = preflopFreq(spot, heroIsRaiser, handClass(c)); return f == null || f >= 0.5; });
+      if (main.length) entries = main;
+    }
     let total = 0;
     for (const [, v] of entries) total += v[0];
     let x = Math.random() * total, combo = entries[0][0];
@@ -286,6 +309,9 @@
         store.set('settings', state.settings);
       };
     });
+    const mo = $('#mainOnly');
+    mo.checked = !!state.settings.mainOnly;
+    mo.onchange = () => { state.settings.mainOnly = mo.checked; store.set('settings', state.settings); };
     const tbox = $('#typeToggles');
     tbox.innerHTML = '';
     Object.keys(TYPES).forEach((t) => {
@@ -338,8 +364,11 @@
     try {
       const ls = loadedSpots();
       if (!ls.length) throw new Error('no spots');
-      const names = ls.map((x) => x.label);
+      const names = Array.from(new Set(ls.map((x) => x.name)));
+      const depths = ls.map((x) => x.depth);
+      const lo = Math.min(...depths), hi = Math.max(...depths);
       $('#spotList').textContent = names.length > 1 ? names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1] : names[0];
+      $('#depthList').textContent = lo === hi ? lo + 'bb' : `${lo}–${hi}bb`;
       $('#flopCount').textContent = ls.reduce((n, x) => n + state.indexes[x.id].flops.length, 0);
       await deal();
     } catch (err) {

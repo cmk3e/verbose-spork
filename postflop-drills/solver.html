@@ -20,7 +20,7 @@
   <header>
     <div class="brand">
       <h1>Solver Flop Drill</h1>
-      <p><span id="spotList">BTN vs BB</span> single-raised pots, 50bb, <span id="flopCount">30</span> solved flops. Graded by EV against a GTO solver.</p>
+      <p><span id="spotList">BTN vs BB</span> single-raised pots, <span id="depthList">50bb</span>, <span id="flopCount">30</span> solved flops. Graded by EV against a GTO solver.</p>
     </div>
     <div class="scoreboard" aria-live="polite">
       <div><b id="score">0/0</b><span>Correct</span></div>
@@ -72,6 +72,10 @@
       <div class="toggles" id="spotToggles"></div>
     </fieldset>
     <fieldset>
+      <legend>Hands</legend>
+      <div class="toggles"><label class="tog"><input type="checkbox" id="mainOnly"><span>Main-range hands only (my preflop chart plays them at least 50%)</span></label></div>
+    </fieldset>
+    <fieldset>
       <legend>Decisions to drill</legend>
       <div class="toggles" id="typeToggles"></div>
     </fieldset>
@@ -85,11 +89,12 @@
   </details>
 
   <footer>
-    Solutions from the open-source postflop-solver (AGPL-3.0) with your PokerCoaching 50bb ranges: BTN or HJ opens 2.2bb and BB calls (5.9bb pot, 47.8bb behind); SB raises to 3.5bb and BB calls (8bb pot, 46.5bb behind).
+    Solutions from the open-source postflop-solver (AGPL-3.0) with your PokerCoaching ranges. 50bb: BTN or HJ opens 2.2bb and BB calls (5.9bb pot, 47.8bb behind); SB raises to 3.5bb and BB calls (8bb pot, 46.5bb behind). 30bb: BTN opens 2.3bb (6.1bb pot, 27.7bb behind). 20bb: BTN opens 2bb (5.5bb pot, 18bb behind).
     Simplified bet sizes: the raiser c-bets 33% or 75% on the flop, BB can lead 33% against BTN or HJ and bet 33% or 75% after SB checks; raises are 3x; turn and river use 66% and all-in. Solved to about 0.5% of the pot.
     Grading: Best = the solver's main play or within 0.05bb; Good = a mixed play or within 2% of the pot; then Inaccuracy (up to 6%), Mistake (up to 15%) and Blunder.
   </footer>
 </div>
+<script src="ranges-data.js"></script>
 <script src="engine.js"></script>
 <script src="solver.js"></script>
 </body>
