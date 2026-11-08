@@ -2,7 +2,10 @@
 // for the Postflop Framework Drills app.
 //
 // usage: export_flops <ranges.txt> <pot_tenths_bb> <stack_tenths_bb> <out_dir> <flop> [<flop> ...]
-//   ranges.txt: line 1 = IP range (preflop raiser), line 2 = OOP range (caller), solver range syntax.
+//   ranges.txt: line 1 = IP range, line 2 = OOP range, solver range syntax.
+//   env FLOP_OOP / FLOP_IP override the flop bet sizes (defaults "33%" / "33%, 75%").
+// Exported nodes: root (OOP first), b1/b2 (IP facing OOP's bets), x (IP after a check),
+//   x-b1/x-b2 (OOP facing IP's bets after checking).
 use postflop_solver::*;
 use std::fmt::Write as _;
 use std::time::Instant;
@@ -75,8 +78,10 @@ fn main() {
             turn: NOT_DEALT,
             river: NOT_DEALT,
         };
-        let flop_ip = BetSizeOptions::try_from(("33%, 75%", "3x")).unwrap();
-        let flop_oop = BetSizeOptions::try_from(("33%", "3x")).unwrap();
+        let ip_sizes = std::env::var("FLOP_IP").unwrap_or("33%, 75%".into());
+        let oop_sizes = std::env::var("FLOP_OOP").unwrap_or("33%".into());
+        let flop_ip = BetSizeOptions::try_from((ip_sizes.as_str(), "3x")).unwrap();
+        let flop_oop = BetSizeOptions::try_from((oop_sizes.as_str(), "3x")).unwrap();
         let later = BetSizeOptions::try_from(("66%", "3x")).unwrap();
         let tree_config = TreeConfig {
             initial_state: BoardState::Flop,
@@ -112,6 +117,17 @@ fn main() {
         // find OOP check, then IP's options
         game.back_to_root();
         let root_actions = game.available_actions();
+        let root_bets: Vec<usize> = root_actions
+            .iter()
+            .enumerate()
+            .filter(|(_, a)| matches!(a, Action::Bet(_)))
+            .map(|(i, _)| i)
+            .collect();
+        for (k, bi) in root_bets.iter().take(2).enumerate() {
+            out.push(',');
+            export_node(&mut game, &[*bi], if k == 0 { "b1" } else { "b2" }, unit, &mut out);
+        }
+        game.back_to_root();
         if let Some(ci) = root_actions.iter().position(|a| *a == Action::Check) {
             out.push(',');
             export_node(&mut game, &[ci], "x", unit, &mut out);

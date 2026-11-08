@@ -4,7 +4,7 @@ Three drills, linked from the top of each page:
 
 - **Flop checklist** (`index.html`): the seven-question postflop thought process below.
 - **Preflop trainer** (`preflop.html`): pick the play from your PokerCoaching charts (opens, facing opens, limps, 3-bets, 4-bets, all-ins at 12–80bb). After each answer it shows the full chart with your hand outlined. Data: `preflop-data.js`.
-- **Solver flop drill** (`solver.html`): BTN vs BB and HJ vs BB single-raised pots at 50bb, 30 solved flops each. You're the raiser after a check, or BB facing a ⅓- or ¾-pot c-bet, and you're graded by EV loss against a GTO solver. Data: `solver-data/`.
+- **Solver flop drill** (`solver.html`): BTN vs BB, HJ vs BB and BB vs SB single-raised pots at 50bb, 30 solved flops each. You're the raiser deciding whether to c-bet, BB after SB checks, or BB facing a ⅓- or ¾-pot c-bet, and you're graded by EV loss against a GTO solver. Data: `solver-data/`.
 
 A static web app for drilling a seven-question postflop checklist for MTT no-limit hold'em:
 
@@ -73,6 +73,9 @@ RUSTFLAGS="--cap-lints warn" cargo build --release --no-default-features --featu
 # ranges file: line 1 = raiser (in position) range, line 2 = BB range, in solver syntax (e.g. "AKs,AQo:0.5")
 ./target/release/examples/export_flops ranges.txt 59 478 ../solves Ks7d2c As7d2c ...   # pot/stack in tenths of a bb
 python3 ../tools/pack_solves.py ../solves ../solver-data/btn-bb-50 btn-bb-50 "BTN vs BB, 50bb" BTN BB
+# raiser out of position (SB vs BB): ranges line 1 = BB, line 2 = SB, and give SB both c-bet sizes
+FLOP_OOP="33%, 75%" ./target/release/examples/export_flops ranges_bb_sb.txt 80 465 ../solves-sb Ks7d2c ...
+python3 ../tools/pack_solves.py ../solves-sb ../solver-data/sb-bb-50 sb-bb-50 "BB vs SB, 50bb" BB SB
 # then add the spot id to SPOTS at the top of solver.js
 ```
 

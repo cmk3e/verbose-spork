@@ -5,18 +5,27 @@
   const E = window.PFEngine;
   // Solved spots; each has solver-data/<id>/index.json. Add new spots here.
   const SPOTS = [
-    { id: 'btn-bb-50', label: 'BTN vs BB' },
-    { id: 'hj-bb-50', label: 'HJ vs BB' },
+    { id: 'btn-bb-50', label: 'BTN vs BB', raiser: 'BTN', caller: 'BB', open: 2.2 },
+    { id: 'hj-bb-50', label: 'HJ vs BB', raiser: 'HJ', caller: 'BB', open: 2.2 },
+    { id: 'sb-bb-50', label: 'BB vs SB', raiser: 'SB', caller: 'BB', open: 3.5 },
   ];
   const RANKS = 'AKQJT98765432';
   const SUIT_SYM = { s: '♠', h: '♥', d: '♦', c: '♣' };
 
-  const NODE_INFO = {
-    x: { ip: true, type: 'ipCheck' },
-    'x-b1': { ip: false, type: 'vsSmall' },
-    'x-b2': { ip: false, type: 'vsBig' },
+  // Which exported solver nodes are drilled, by whether the preflop raiser is in position.
+  // root = OOP acts first; b1/b2 = IP facing OOP's bets; x = IP after a check; x-b1/x-b2 = OOP facing IP's bets.
+  const DRILL_NODES = {
+    raiserIP: { x: 'cbet', 'x-b1': 'vsSmall', 'x-b2': 'vsBig' },
+    raiserOOP: { root: 'cbet', b1: 'vsSmall', b2: 'vsBig', x: 'stab' },
   };
-  const TYPES = { ipCheck: 'Raiser: c-bet or check back', vsSmall: 'BB: facing a ⅓-pot bet', vsBig: 'BB: facing a ¾-pot bet' };
+  const TYPES = {
+    cbet: 'Raiser: c-bet or check',
+    vsSmall: 'Caller: facing a ⅓-pot c-bet',
+    vsBig: 'Caller: facing a ¾-pot c-bet',
+    stab: 'Caller: bet or check after the raiser checks',
+  };
+  const typeLabel = (t, sp) => TYPES[t].replace('Raiser', sp.raiser).replace('Caller', sp.caller);
+  const drillNodes = (sp, index) => DRILL_NODES[index.ip === sp.raiser ? 'raiserIP' : 'raiserOOP'];
 
   const store = {
     get(k, d) { try { const v = localStorage.getItem('psd:' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
@@ -27,8 +36,8 @@
   const rand = (n) => Math.floor(Math.random() * n);
 
   const state = {
-    indexes: {}, index: null, cache: {}, flop: null, nodeName: null, node: null, combo: null, answered: false,
-    settings: Object.assign({ types: Object.keys(TYPES), spots: SPOTS.map((x) => x.id) }, store.get('settings', {})),
+    indexes: {}, spot: null, index: null, cache: {}, flop: null, nodeName: null, node: null, combo: null, answered: false,
+    settings: migrateSettings(store.get('settings', {})),
     stats: migrateStats(store.get('stats', {})),
     session: { right: 0, total: 0, streak: 0, hands: 0, evLoss: 0 },
   };
@@ -37,7 +46,18 @@
   // stats are kept per spot and node type ("btn-bb-50:vsSmall"); older saves had type only
   function migrateStats(st) {
     const out = {};
-    for (const [k, v] of Object.entries(st)) out[k.includes(':') ? k : SPOTS[0].id + ':' + k] = v;
+    for (const [k, v] of Object.entries(st)) out[(k.includes(':') ? k : SPOTS[0].id + ':' + k).replace('ipCheck', 'cbet')] = v;
+    return out;
+  }
+  function migrateSettings(s) {
+    const out = Object.assign({ types: Object.keys(TYPES), spots: SPOTS.map((x) => x.id) }, s);
+    if (!s.v) {
+      // v1 had no "stab" type and called the c-bet type "ipCheck"; new spots start enabled
+      out.types = out.types.map((t) => (t === 'ipCheck' ? 'cbet' : t)).concat(['stab']);
+      out.spots = Array.from(new Set(out.spots.concat(['sb-bb-50'])));
+    }
+    out.types = Object.keys(TYPES).filter((t) => out.types.includes(t));
+    out.v = 2;
     return out;
   }
   const fmt = (x) => (Math.round(x * 100) / 100).toFixed(2);
@@ -81,13 +101,16 @@
   // ------------------------------------------------------------ deal
   async function deal() {
     const types = state.settings.types.length ? state.settings.types : Object.keys(TYPES);
-    const names = Object.keys(NODE_INFO).filter((n) => types.includes(NODE_INFO[n].type));
-    const avSpots = loadedSpots().filter((x) => state.settings.spots.includes(x.id));
-    const spot = (avSpots.length ? avSpots : loadedSpots())[rand(avSpots.length || loadedSpots().length)];
+    const namesFor = (sp) => Object.entries(drillNodes(sp, state.indexes[sp.id])).filter(([, t]) => types.includes(t)).map(([n]) => n);
+    let avSpots = loadedSpots().filter((x) => state.settings.spots.includes(x.id) && namesFor(x).length);
+    if (!avSpots.length) avSpots = loadedSpots().filter((x) => namesFor(x).length);
+    if (!avSpots.length) avSpots = loadedSpots();
+    const spot = avSpots[rand(avSpots.length)];
     const index = state.indexes[spot.id];
     const flopName = index.flops[rand(index.flops.length)];
     const flop = await loadFlop(spot.id, flopName);
-    const avail = names.filter((n) => flop.nodes[n]);
+    let avail = namesFor(spot).filter((n) => flop.nodes[n]);
+    if (!avail.length) avail = Object.keys(drillNodes(spot, index)).filter((n) => flop.nodes[n]);
     const nodeName = avail[rand(avail.length)];
     const node = flop.nodes[nodeName];
     // deal a combo in proportion to how often it reaches this spot
@@ -96,7 +119,7 @@
     for (const [, v] of entries) total += v[0];
     let x = Math.random() * total, combo = entries[0][0];
     for (const [c, v] of entries) { x -= v[0]; if (x <= 0) { combo = c; break; } }
-    Object.assign(state, { index, flop, nodeName, node, combo, answered: false });
+    Object.assign(state, { spot, index, flop, nodeName, node, combo, answered: false });
     state.session.hands++;
     render();
   }
@@ -104,18 +127,24 @@
   // ------------------------------------------------------------ render
   function render() {
     const { flop, node, nodeName, combo } = state;
-    const info = NODE_INFO[nodeName];
     const { ip, oop } = state.index;
-    $('#spotChip').textContent = `${ip} vs ${oop}`;
-    $('#typeChip').textContent = info.ip ? `You: ${ip} (in position)` : `You: ${oop} (out of position)`;
-    $('#depthChip').textContent = Math.round(flop.stack + 2.2) + 'bb deep';
+    const sp = state.spot;
+    const heroIP = node.player === 'IP';
+    const hero = heroIP ? ip : oop;
+    $('#spotChip').textContent = sp.label;
+    $('#typeChip').textContent = `You: ${hero} (${heroIP ? 'in' : 'out of'} position)`;
+    $('#depthChip').textContent = Math.round(flop.stack + sp.open) + 'bb deep';
     $('#pot').textContent = node.pot.toFixed(1) + 'bb';
-    const preflop = info.ip ? `<b>You (${ip})</b> open 2.2bb, ${oop} calls.` : `${ip} opens 2.2bb, <b>you (${oop})</b> call.`;
-    let line = `${oop} checks to you.`;
-    if (nodeName !== 'x') {
-      const bet = state.flop.nodes.x.actions[nodeName === 'x-b1' ? 1 : 2];
-      line = `You check, ${ip} ${actionText(bet, flop.pot).replace('Bet', 'bets')}.`;
-    }
+    const verb = sp.raiser === 'SB' ? 'raise' : 'open';
+    const preflop = hero === sp.raiser
+      ? `<b>You (${sp.raiser})</b> ${verb} to ${sp.open}bb, ${sp.caller} calls.`
+      : `${sp.raiser} ${verb}s to ${sp.open}bb, <b>you (${sp.caller})</b> call.`;
+    const betText = (from, i) => actionText(flop.nodes[from].actions.filter((a) => /^Bet/.test(a))[i], flop.pot).replace('Bet', 'bets');
+    let line;
+    if (nodeName === 'root') line = 'you act first.';
+    else if (nodeName === 'x') line = `${oop} checks to you.`;
+    else if (nodeName === 'b1' || nodeName === 'b2') line = `${oop} ${betText('root', nodeName === 'b1' ? 0 : 1)}.`;
+    else line = `you check, ${ip} ${betText('x', nodeName === 'x-b1' ? 0 : 1)}.`;
     $('#action').innerHTML = `${preflop} Flop: ${line}`;
     const board = $('#board');
     board.innerHTML = '';
@@ -158,7 +187,7 @@
     const ss = state.session;
     ss.total++; ss.evLoss += loss;
     if (ok) { ss.right++; ss.streak++; } else ss.streak = 0;
-    const type = state.index.id + ':' + NODE_INFO[nodeName].type;
+    const type = state.index.id + ':' + drillNodes(state.spot, state.index)[nodeName];
     const st = state.stats[type] || { right: 0, total: 0, loss: 0 };
     st.total++; st.loss += loss; if (ok) st.right++;
     state.stats[type] = st;
@@ -230,7 +259,7 @@
     node.actions.forEach((a, j) => {
       legend.appendChild(el('span', 'lg', `<i style="background:${color(j)}"></i>${actionText(a, node.pot)} <b class="num">${Math.round(tot[j] / W)}%</b>`));
     });
-    $('#chartTitle').textContent = `Solver strategy for the whole ${NODE_INFO[state.nodeName].ip ? state.index.ip : state.index.oop} range on ${state.flop.flop}`;
+    $('#chartTitle').textContent = `Solver strategy for the whole ${state.node.player === 'IP' ? state.index.ip : state.index.oop} range on ${state.flop.flop}`;
     $('#chartWrap').hidden = false;
   }
 
@@ -261,6 +290,7 @@
     tbox.innerHTML = '';
     Object.keys(TYPES).forEach((t) => {
       const lab = el('label', 'tog', `<input type="checkbox" id="stype-${t}"><span>${TYPES[t]}</span>`);
+      if (t === 'stab' && !loadedSpots().some((sp) => Object.values(drillNodes(sp, state.indexes[sp.id])).includes('stab'))) return;
       tbox.appendChild(lab);
       const cb = lab.querySelector('input');
       cb.checked = state.settings.types.includes(t);
@@ -277,12 +307,11 @@
   function renderStats() {
     const tb = $('#statsBody');
     tb.innerHTML = '';
-    loadedSpots().forEach((sp) => Object.keys(TYPES).forEach((t) => {
+    loadedSpots().forEach((sp) => Object.values(drillNodes(sp, state.indexes[sp.id])).forEach((t) => {
       const st = state.stats[sp.id + ':' + t] || { right: 0, total: 0, loss: 0 };
       const p = st.total ? Math.round((st.right / st.total) * 100) : null;
       const tr = el('tr');
-      const ip = state.indexes[sp.id].ip;
-      tr.innerHTML = `<td>${sp.label} · ${TYPES[t].replace('Raiser', ip)}</td><td class="num">${st.right}/${st.total}</td>
+      tr.innerHTML = `<td>${sp.label} · ${typeLabel(t, sp)}</td><td class="num">${st.right}/${st.total}</td>
         <td class="num">${st.total ? fmt(st.loss / st.total) + 'bb' : '–'}</td>
         <td class="barcell"><div class="bar"><i style="width:${p || 0}%"></i></div><span class="num">${p == null ? '–' : p + '%'}</span></td>`;
       tb.appendChild(tr);
@@ -309,7 +338,8 @@
     try {
       const ls = loadedSpots();
       if (!ls.length) throw new Error('no spots');
-      $('#spotList').textContent = ls.map((x) => x.label).join(' and ');
+      const names = ls.map((x) => x.label);
+      $('#spotList').textContent = names.length > 1 ? names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1] : names[0];
       $('#flopCount').textContent = ls.reduce((n, x) => n + state.indexes[x.id].flops.length, 0);
       await deal();
     } catch (err) {
