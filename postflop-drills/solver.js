@@ -115,6 +115,22 @@
   }
   const loadedSpots = () => SPOTS.filter((x) => state.indexes[x.id]);
 
+  // A "facing a bet" node is only drilled when the bettor actually uses that size at least
+  // 5% of the time on this flop; for sizes the solver almost never picks, the responses
+  // are barely converged and the EVs can be misleading.
+  const PARENT = { 'x-b1': ['x', 0], 'x-b2': ['x', 1], b1: ['root', 0], b2: ['root', 1] };
+  function betUsed(flop, name) {
+    const par = PARENT[name];
+    if (!par) return true;
+    const pn = flop.nodes[par[0]];
+    if (!pn) return true;
+    const j = pn.actions.map((a, i) => [a, i]).filter(([a]) => /^Bet/.test(a))[par[1]];
+    if (!j) return false;
+    let w = 0, f = 0;
+    for (const v of Object.values(pn.hands)) { w += v[0]; f += v[0] * v[1 + j[1]]; }
+    return w > 0 && f / w >= 5;
+  }
+
   // ------------------------------------------------------------ deal
   async function deal() {
     const types = state.settings.types.length ? state.settings.types : Object.keys(TYPES);
@@ -126,7 +142,7 @@
     const index = state.indexes[spot.id];
     const flopName = index.flops[rand(index.flops.length)];
     const flop = await loadFlop(spot.id, flopName);
-    let avail = namesFor(spot).filter((n) => flop.nodes[n]);
+    let avail = namesFor(spot).filter((n) => flop.nodes[n] && betUsed(flop, n));
     if (!avail.length) avail = Object.keys(drillNodes(spot, index)).filter((n) => flop.nodes[n]);
     const nodeName = avail[rand(avail.length)];
     const node = flop.nodes[nodeName];
