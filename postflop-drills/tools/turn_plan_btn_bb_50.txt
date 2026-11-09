@@ -1,0 +1,10 @@
+Ks7d2c 97 459 Ah:overcard Kh:pairs_the_top_card 2h:pairs_the_bottom_card 9s:brings_a_flush_draw 3h:blank 8h:middle_card Qh:other 4h:other
+As7d2c 97 459 Ah:pairs_the_top_card 2h:pairs_the_bottom_card 9s:brings_a_flush_draw 5h:straight_card 6h:blank 9h:middle_card 3h:other Kh:other
+AhKd5c 97 459 As:pairs_the_top_card 5s:pairs_the_bottom_card 8h:brings_a_flush_draw Ts:straight_card 6s:blank 9s:middle_card 2s:other 3s:other
+QsTd8c 97 459 Ah:overcard Qh:pairs_the_top_card 8h:pairs_the_bottom_card 7s:brings_a_flush_draw Jh:straight_card 2h:blank Kh:overcard 3h:other
+Jc7c2h 97 459 Ad:overcard Jd:pairs_the_top_card 2d:pairs_the_bottom_card 9c:completes_the_flush Td:straight_card 3d:blank 6d:middle_card Kd:overcard
+Th9h8c 97 459 Ad:overcard Td:pairs_the_top_card 8d:pairs_the_bottom_card 7h:completes_the_flush Jd:straight_card 2d:blank Kd:overcard 3d:other
+9s6h4c 97 459 Ad:overcard 9d:pairs_the_top_card 4d:pairs_the_bottom_card Ts:brings_a_flush_draw 7d:straight_card 2d:blank Kd:overcard 3d:other
+8d5s2h 97 459 Ac:overcard 8c:pairs_the_top_card 2c:pairs_the_bottom_card Td:brings_a_flush_draw 6c:straight_card 3c:blank Kc:overcard 4c:other
+7d7c2s 97 459 Ah:overcard 7h:pairs_the_top_card 2h:pairs_the_bottom_card 9d:brings_a_flush_draw 3h:blank 5h:middle_card Kh:overcard 4h:other
+6s4d3c 97 459 Ah:overcard 6h:pairs_the_top_card 3h:pairs_the_bottom_card Ts:brings_a_flush_draw 5h:straight_card 2h:blank Kh:overcard

@@ -150,3 +150,14 @@ console.log(n + ' test groups passed');
   assert.ok(/second-nut backdoor/.test(f('Kd5c', '9d8d6s').label));
   console.log('hand features ok');
 }
+
+// turn boards: no backdoor draws, equity runs out the river only
+{
+  const b = (s) => s.match(/../g).map(E.parseCard);
+  assert.strictEqual(E.backdoorFlush(b('Qh9h'), b('Ks7d2cAh')), null);
+  const one = (h) => { const x = b(h); x.w = 1; return [x]; };
+  // AsKd (two pair) vs QhJh (gutshot to a broadway straight with a T: 4 outs of 44)
+  const eq = E.rangeEquity(one('AsKd'), one('QhJh'), b('Ks7d2cAh'), 4000);
+  assert.ok(Math.abs(eq - 40 / 44) < 0.03, 'turn equity ' + eq);
+  console.log('turn boards ok');
+}

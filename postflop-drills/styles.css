@@ -306,3 +306,6 @@ footer { color: var(--muted); font-size: .78rem; max-width: 65ch; }
 .adv-v.opp { color: var(--bad, #c0392b); }
 .adv small { color: var(--muted); font-size: .8rem; line-height: 1.35; }
 @media (max-width: 520px) { .adv { grid-template-columns: 1fr; } }
+
+/* turn drill: gap before the turn card */
+.cards .turncard { margin-left: 10px; }

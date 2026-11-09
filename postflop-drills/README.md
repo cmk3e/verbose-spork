@@ -4,6 +4,7 @@ Three drills, linked from the top of each page:
 
 - **Flop checklist** (`index.html`): the seven-question postflop thought process below.
 - **Preflop trainer** (`preflop.html`): pick the play from your PokerCoaching charts (opens, facing opens, limps, 3-bets, 4-bets, all-ins at 12–80bb). After each answer it shows the full chart with your hand outlined. Data: `preflop-data.js`.
+- **Solver turn drill** (`turn.html`, pilot): BTN vs BB 50bb after BB checks the flop, BTN bets ⅓ and BB calls. 10 flops × about 8 turn cards (overcard, board pair, flush, straight, blank, middle card), 79 turns in all. Decisions: BB leads or checks, BTN barrels (⅓, ¾ or 125% overbet) or checks back, BB faces each barrel size, BTN faces a lead. Same EV grading, why panel and range/nut advantage cards as the flop drill, recomputed for the turn card.
 - **12bb push/fold** (`pushfold.html`): the preflop trainer limited to your 12bb charts and grouped as push/fold spots: open shove (or min-raise) or fold, rejam over an open, call an open-shove, call a rejam after you min-raised, and BB vs SB limp. Filter by your position; after each answer you see the whole chart and its overall shove/call ranges. One 12bb chart (BTN vs HJ all-in) is drawn incorrectly in the PDF and is corrected in `tools/chart_fixes.json`.
 - **Solver flop drill** (`solver.html`): BTN vs BB at 50, 30 and 20bb; BB vs SB at 50, 30 and 20bb; UTG, HJ and CO vs BB, CO vs BTN (BTN flats), and BB 3-bet vs BTN, SB 3-bet vs BTN and BTN 3-bet vs CO at 50bb; single-raised pots, 30 solved flops each. A setting limits deals to hands the preflop chart plays at least half the time. After each answer, a "why" panel describes your hand (made hand, draws, backdoor flush draws), compares the same hand in other suits, and shows how the range plays each hand type (strong made hands, strong draws, marginal made hands, weak draws, air). `solver.html?hand=sb-bb-50/9d8d6s/root/Ks5d` opens a specific hand. The play panel shows who has the range advantage and the nut advantage, using the checklist's measures on the solver's starting ranges for that flop (a setting can hide them until you answer). You're the raiser deciding whether to c-bet, BB after SB checks, or BB facing a ⅓- or ¾-pot c-bet, and you're graded by EV loss against a GTO solver. Data: `solver-data/`.
 
@@ -88,3 +89,18 @@ Each flop takes about 3½ minutes on 4 cores and about 3.4GB of memory. The tree
 - Turn and river: 66% bets, plus all-in.
 
 Flops are solved to about 0.5% of the pot.
+
+### Turn spots
+
+Turns are solved on their own (turn and river) from the ranges the flop solve reaches:
+
+```
+# ranges after the flop line (IP bet small, OOP called) + 8 representative turn cards
+python3 tools/turn_setup.py ../solves/Ks7d2c.json ranges_Ks7d2c.txt   # prints: pot stack turn:kind ...
+cp tools/solver/export_turns.rs postflop-solver/examples/ && cargo build ... --example export_turns
+./target/release/examples/export_turns ranges_Ks7d2c.txt 97 459 ../turns Ks7d2c Ah Kh 2h 9s 3h 8h Qh 4h
+python3 tools/pack_turns.py ../turns solver-data/btn-bb-50-t1 btn-bb-50-t1 "..." BTN BB tools/turn_plan_btn_bb_50.txt
+```
+
+Turn bet sizes: in-position 33/75/125%, out-of-position leads 33/75%, river 33/75% plus all-in. Each turn solves in 1-3 seconds.
+

@@ -1,10 +1,12 @@
-/* Solver flop drill: graded against precomputed postflop-solver strategies.
- * Loads solver-data/<spot>/index.json and one <flop>.json at a time. */
+/* Solver flop and turn drills: graded against precomputed postflop-solver strategies.
+ * Loads solver-data/<spot>/index.json and one <board>.json at a time.
+ * turn.html sets window.SOLVER_STREET = 'turn' for the turn drill. */
 (function () {
   'use strict';
   const E = window.PFEngine;
+  const STREET = window.SOLVER_STREET === 'turn' ? 'turn' : 'flop';
   // Solved spots; each has solver-data/<id>/index.json. Add new spots here.
-  const SPOTS = [
+  const ALL_SPOTS = [
     { id: 'btn-bb-50', name: 'BTN vs BB', depth: 50, raiser: 'BTN', caller: 'BB', open: 2.2 },
     { id: 'btn-bb-30', name: 'BTN vs BB', depth: 30, raiser: 'BTN', caller: 'BB', open: 2.3 },
     { id: 'btn-bb-20', name: 'BTN vs BB', depth: 20, raiser: 'BTN', caller: 'BB', open: 2 },
@@ -27,8 +29,15 @@
     { id: 'co-bb-50', name: 'CO vs BB', depth: 50, raiser: 'CO', caller: 'BB', open: 2.2 },
     { id: 'sb-bb-30', name: 'BB vs SB', depth: 30, raiser: 'SB', caller: 'BB', open: 3.2 },
     { id: 'sb-bb-20', name: 'BB vs SB', depth: 20, raiser: 'SB', caller: 'BB', open: 3 },
+    // turn spots: flopLine describes the flop action that led here
+    {
+      id: 'btn-bb-50-t1', street: 'turn', name: 'BTN vs BB', depth: 50, raiser: 'BTN', caller: 'BB', open: 2.2,
+      lineName: '⅓ c-bet called',
+      flopLine: { raiser: 'BB checks, <b>you</b> bet {bet}, BB calls.', caller: '<b>You</b> check, BTN bets {bet}, <b>you</b> call.', bet: 1.9 },
+    },
   ];
-  SPOTS.forEach((sp) => { sp.label = `${sp.name} ${sp.depth}bb`; });
+  ALL_SPOTS.forEach((sp) => { sp.street = sp.street || 'flop'; sp.label = `${sp.name} ${sp.depth}bb` + (sp.lineName ? ` · ${sp.lineName}` : ''); });
+  const SPOTS = ALL_SPOTS.filter((sp) => sp.street === STREET);
 
   // Preflop frequency (0-1) of a hand class for the hero's preflop action in this spot,
   // from the chart data (ranges-data.js). Null when the chart is unavailable.
@@ -51,22 +60,33 @@
 
   // Which exported solver nodes are drilled, by whether the preflop raiser is in position.
   // root = OOP acts first; b1/b2 = IP facing OOP's bets; x = IP after a check; x-b1/x-b2 = OOP facing IP's bets.
+  // Turn spots (raiser in position): root = caller leads or checks, x = raiser after a check,
+  // x-b1/2/3 = caller facing a ⅓, ¾ or overbet barrel, b1/b2 = raiser facing a lead.
   const DRILL_NODES = {
     raiserIP: { x: 'cbet', 'x-b1': 'vsSmall', 'x-b2': 'vsBig' },
     raiserOOP: { root: 'cbet', b1: 'vsSmall', b2: 'vsBig', x: 'stab' },
+    turnRaiserIP: { root: 'tLead', x: 'tBarrel', 'x-b1': 'tVsSmall', 'x-b2': 'tVsBig', 'x-b3': 'tVsOver', b1: 'tVsLead', b2: 'tVsLead' },
   };
-  const TYPES = {
+  const TYPES = STREET === 'turn' ? {
+    tBarrel: 'Raiser: barrel or check back',
+    tVsSmall: 'Caller: facing a ⅓-pot barrel',
+    tVsBig: 'Caller: facing a ¾-pot barrel',
+    tVsOver: 'Caller: facing an overbet',
+    tLead: 'Caller: lead or check',
+    tVsLead: 'Raiser: facing a lead',
+  } : {
     cbet: 'Raiser: c-bet or check',
     vsSmall: 'Caller: facing a ⅓-pot c-bet',
     vsBig: 'Caller: facing a ¾-pot c-bet',
     stab: 'Caller: bet or check after the raiser checks',
   };
   const typeLabel = (t, sp) => TYPES[t].replace('Raiser', sp.raiser).replace('Caller', sp.caller);
-  const drillNodes = (sp, index) => DRILL_NODES[index.ip === sp.raiser ? 'raiserIP' : 'raiserOOP'];
+  const drillNodes = (sp, index) => (sp.street === 'turn' ? DRILL_NODES.turnRaiserIP : DRILL_NODES[index.ip === sp.raiser ? 'raiserIP' : 'raiserOOP']);
 
+  const PREFIX = STREET === 'turn' ? 'pst:' : 'psd:';
   const store = {
-    get(k, d) { try { const v = localStorage.getItem('psd:' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
-    set(k, v) { try { localStorage.setItem('psd:' + k, JSON.stringify(v)); } catch (e) { /* ignore */ } },
+    get(k, d) { try { const v = localStorage.getItem(PREFIX + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem(PREFIX + k, JSON.stringify(v)); } catch (e) { /* ignore */ } },
   };
   const $ = (s) => document.querySelector(s);
   const el = (tag, cls, html) => { const n = document.createElement(tag); if (cls) n.className = cls; if (html != null) n.innerHTML = html; return n; };
@@ -88,6 +108,13 @@
   }
   function migrateSettings(s) {
     const out = Object.assign({ types: Object.keys(TYPES), spots: SPOTS.map((x) => x.id) }, s);
+    if (STREET === 'turn') {
+      if (out.mainOnly == null) out.mainOnly = false;
+      if (out.showAdv == null) out.showAdv = true;
+      out.types = Object.keys(TYPES).filter((t) => out.types.includes(t));
+      if (!out.types.length) out.types = Object.keys(TYPES);
+      return out;
+    }
     if (!s.v) {
       // v1 had no "stab" type and called the c-bet type "ipCheck"; new spots start enabled
       out.types = out.types.map((t) => (t === 'ipCheck' ? 'cbet' : t)).concat(['stab']);
@@ -143,7 +170,7 @@
   // A "facing a bet" node is only drilled when the bettor actually uses that size at least
   // 5% of the time on this flop; for sizes the solver almost never picks, the responses
   // are barely converged and the EVs can be misleading.
-  const PARENT = { 'x-b1': ['x', 0], 'x-b2': ['x', 1], b1: ['root', 0], b2: ['root', 1] };
+  const PARENT = { 'x-b1': ['x', 0], 'x-b2': ['x', 1], 'x-b3': ['x', 2], b1: ['root', 0], b2: ['root', 1] };
   function betUsed(flop, name) {
     const par = PARENT[name];
     if (!par) return true;
@@ -208,7 +235,7 @@
     const hero = heroIP ? ip : oop;
     $('#spotChip').textContent = sp.label;
     $('#typeChip').textContent = `You: ${hero} (${heroIP ? 'in' : 'out of'} position)`;
-    $('#depthChip').textContent = Math.round(flop.stack + sp.open) + 'bb deep';
+    $('#depthChip').textContent = sp.depth + 'bb deep';
     $('#pot').textContent = node.pot.toFixed(1) + 'bb';
     const verb = sp.raiser === 'SB' ? 'raise' : 'open';
     const preflop = sp.pre ? sp.pre[hero === sp.raiser ? 'raiser' : 'caller'] : hero === sp.raiser
@@ -219,15 +246,25 @@
     if (nodeName === 'root') line = 'you act first.';
     else if (nodeName === 'x') line = `${oop} checks to you.`;
     else if (nodeName === 'b1' || nodeName === 'b2') line = `${oop} ${betText('root', nodeName === 'b1' ? 0 : 1)}.`;
-    else line = `you check, ${ip} ${betText('x', nodeName === 'x-b1' ? 0 : 1)}.`;
-    $('#action').innerHTML = `${preflop} Flop: ${line}`;
+    else line = `you check, ${ip} ${betText('x', { 'x-b1': 0, 'x-b2': 1, 'x-b3': 2 }[nodeName])}.`;
+    const cards = flop.flop.match(/../g);
+    if (sp.street === 'turn') {
+      const fl = sp.flopLine[hero === sp.raiser ? 'raiser' : 'caller'].replace('{bet}', sp.flopLine.bet + 'bb');
+      const kind = (state.index.turnKind || {})[flop.flop];
+      const turnCard = prettyCard(cards[3]);
+      $('#action').innerHTML = `${preflop} Flop ${cards.slice(0, 3).map(prettyCard).join('')}: ${fl} Turn ${turnCard}${kind ? ` (${kind})` : ''}: ${line}`;
+    } else {
+      $('#action').innerHTML = `${preflop} Flop: ${line}`;
+    }
     const board = $('#board');
     board.innerHTML = '';
-    flop.flop.match(/../g).forEach((c, i) => { const n = cardEl(c); n.style.setProperty('--i', i); board.appendChild(n); });
+    cards.forEach((c, i) => { const n = cardEl(c); n.style.setProperty('--i', i); if (i === 3) n.classList.add('turncard'); board.appendChild(n); });
     const hole = $('#hole');
     hole.innerHTML = '';
     [combo.slice(0, 2), combo.slice(2)].forEach((c, i) => { const n = cardEl(c, true); n.style.setProperty('--i', i + 3); hole.appendChild(n); });
-    $('#texture').textContent = E ? 'Board: ' + E.describeBoard(flop.flop.match(/../g).map(E.parseCard)) : '';
+    $('#texture').textContent = !E ? '' : sp.street === 'turn'
+      ? `Flop: ${E.describeBoard(cards.slice(0, 3).map(E.parseCard))}. Turn: ${(state.index.turnKind || {})[flop.flop] || cards[3]}.`
+      : 'Board: ' + E.describeBoard(cards.map(E.parseCard));
     const opts = $('#options');
     opts.innerHTML = '';
     node.actions.forEach((a, i) => {
@@ -347,6 +384,7 @@
   }
 
   // ------------------------------------------------------------ explanation
+  const prettyCard = (c) => c[0].replace('T', '10') + SUIT_SYM[c[1]];
   const prettyCombo = (c) => c[0].replace('T', '10') + SUIT_SYM[c[1]] + c[2].replace('T', '10') + SUIT_SYM[c[3]];
   const kindOf = (a) => (/^(Bet|Raise|All-in)/.test(a) ? 'aggr' : a === 'Fold' ? 'fold' : 'passive');
   const shortAct = (a, pot) => {
@@ -423,9 +461,7 @@
       const text = (RATIONALE[hero.group][gk] || '').replace(/\{a\}/g, verbs.a).replace(/\{p\}/g, verbs.p);
       if (text) parts.push(`<p><b>${E.HAND_GROUPS[hero.group]}:</b> ${mixText(norm(hg), node.actions, node.pot)}. ${text}</p>`);
       const mine = kindMix(freqs);
-      if (topKind(mine) !== gk && Math.abs(mine[gk] - gm[gk]) > 30) {
-        parts.push(`<p>Your exact combo plays differently from most hands of its type. Compare it with the same hand in other suits below.</p>`);
-      }
+      if (topKind(mine) !== gk && Math.abs(mine[gk] - gm[gk]) > 30) parts.push('__DIFFERENT__');
     }
 
     // same hand class, other suits (only when the suits change the strategy)
@@ -434,6 +470,12 @@
       const xs = sibRows.map((r) => r.f[j]);
       return Math.max(...xs) - Math.min(...xs) >= 25;
     });
+    const diffIdx = parts.indexOf('__DIFFERENT__');
+    if (diffIdx >= 0) {
+      parts[diffIdx] = differs
+        ? '<p>Your exact combo plays differently from most hands of its type. Compare it with the same hand in other suits below.</p>'
+        : '<p>Your exact combo plays differently from most hands of its type: its exact cards (kicker, blockers, draws) change how it does against the hands that continue.</p>';
+    }
     if (differs) {
       sibRows.sort((x, y) => kindMix(y.f).aggr - kindMix(x.f).aggr);
       const rows = sibRows.map((r) => {
@@ -599,6 +641,7 @@
       $('#spotList').textContent = names.length > 1 ? names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1] : names[0];
       $('#depthList').textContent = lo === hi ? lo + 'bb' : `${lo}–${hi}bb`;
       $('#flopCount').textContent = ls.reduce((n, x) => n + state.indexes[x.id].flops.length, 0);
+      if (STREET === 'turn' && $('#lineList')) $('#lineList').textContent = Array.from(new Set(ls.map((x) => x.lineName))).join(', ');
       await deal();
     } catch (err) {
       $('#action').textContent = 'Could not load the solver data. Open this page from the website (not a saved file) and refresh.';

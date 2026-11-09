@@ -486,6 +486,7 @@
    * the best missing card of the suit, 'second' for the next one, otherwise 'weak'.
    */
   function backdoorFlush(hole, board) {
+    if (board.length !== 3) return null; // only the flop has two cards to come
     for (let s = 0; s < 4; s++) {
       const mine = hole.filter((c) => sOf(c) === s).map(rOf);
       const onBoard = board.filter((c) => sOf(c) === s).map(rOf);
@@ -570,7 +571,7 @@
     return { aFrac: ia, bFrac: ib, cutLabel: classify(cutRow.h, board).label };
   }
 
-  /** Monte Carlo equity of range A vs range B on a flop (runs out turn + river). */
+  /** Monte Carlo equity of range A vs range B on a flop (runs out turn + river) or a turn (river only). */
   function rangeEquity(a, b, board, iters) {
     iters = iters || 6000;
     const dead = new Set(board);
@@ -595,8 +596,10 @@
       guard++;
       const ha = drawA(), hb = drawB();
       if (ha[0] === hb[0] || ha[0] === hb[1] || ha[1] === hb[0] || ha[1] === hb[1]) continue;
+      if (dead.has(ha[0]) || dead.has(ha[1]) || dead.has(hb[0]) || dead.has(hb[1])) continue;
       let t1, t2;
-      do { t1 = deck[randInt(deck.length)]; } while (t1 === ha[0] || t1 === ha[1] || t1 === hb[0] || t1 === hb[1]);
+      if (board.length >= 4) t1 = board[3];
+      else do { t1 = deck[randInt(deck.length)]; } while (t1 === ha[0] || t1 === ha[1] || t1 === hb[0] || t1 === hb[1]);
       do { t2 = deck[randInt(deck.length)]; } while (t2 === t1 || t2 === ha[0] || t2 === ha[1] || t2 === hb[0] || t2 === hb[1]);
       ca[0] = ha[0]; ca[1] = ha[1]; ca[5] = t1; ca[6] = t2;
       cb[0] = hb[0]; cb[1] = hb[1]; cb[5] = t1; cb[6] = t2;
