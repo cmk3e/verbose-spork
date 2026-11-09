@@ -15,6 +15,18 @@
       id: 'bb3-btn-50', name: 'BB 3-bet vs BTN', depth: 50, raiser: 'BB', caller: 'BTN', open: 8.8,
       pre: { raiser: 'BTN opens 2.2bb, <b>you (BB)</b> 3-bet to 8.8bb, BTN calls.', caller: '<b>You (BTN)</b> open 2.2bb, BB 3-bets to 8.8bb, you call.' },
     },
+    {
+      id: 'sb3-btn-50', name: 'SB 3-bet vs BTN', depth: 50, raiser: 'SB', caller: 'BTN', open: 8.8,
+      pre: { raiser: 'BTN opens 2.2bb, <b>you (SB)</b> 3-bet to 8.8bb, BB folds, BTN calls.', caller: '<b>You (BTN)</b> open 2.2bb, SB 3-bets to 8.8bb, BB folds, you call.' },
+    },
+    {
+      id: 'btn3-co-50', name: 'BTN 3-bet vs CO', depth: 50, raiser: 'BTN', caller: 'CO', open: 6.6,
+      pre: { raiser: 'CO opens 2.2bb, <b>you (BTN)</b> 3-bet to 6.6bb, blinds fold, CO calls.', caller: '<b>You (CO)</b> open 2.2bb, BTN 3-bets to 6.6bb, blinds fold, you call.' },
+    },
+    { id: 'utg-bb-50', name: 'UTG vs BB', depth: 50, raiser: 'UTG', caller: 'BB', open: 2.2 },
+    { id: 'co-bb-50', name: 'CO vs BB', depth: 50, raiser: 'CO', caller: 'BB', open: 2.2 },
+    { id: 'sb-bb-30', name: 'BB vs SB', depth: 30, raiser: 'SB', caller: 'BB', open: 3.2 },
+    { id: 'sb-bb-20', name: 'BB vs SB', depth: 20, raiser: 'SB', caller: 'BB', open: 3 },
   ];
   SPOTS.forEach((sp) => { sp.label = `${sp.name} ${sp.depth}bb`; });
 
@@ -83,10 +95,11 @@
     }
     if ((s.v || 1) < 3) out.spots = Array.from(new Set(out.spots.concat(['btn-bb-30', 'btn-bb-20'])));
     if ((s.v || 1) < 4) out.spots = Array.from(new Set(out.spots.concat(['co-btn-50', 'bb3-btn-50'])));
+    if ((s.v || 1) < 5) out.spots = Array.from(new Set(out.spots.concat(['sb3-btn-50', 'btn3-co-50', 'utg-bb-50', 'co-bb-50', 'sb-bb-30', 'sb-bb-20'])));
     if (out.mainOnly == null) out.mainOnly = false;
     if (out.showAdv == null) out.showAdv = true;
     out.types = Object.keys(TYPES).filter((t) => out.types.includes(t));
-    out.v = 4;
+    out.v = 5;
     return out;
   }
   const fmt = (x) => (Math.round(x * 100) / 100).toFixed(2);
