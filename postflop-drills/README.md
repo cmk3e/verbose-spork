@@ -4,7 +4,7 @@ Three drills, linked from the top of each page:
 
 - **Flop checklist** (`index.html`): the seven-question postflop thought process below.
 - **Preflop trainer** (`preflop.html`): pick the play from your PokerCoaching charts (opens, facing opens, limps, 3-bets, 4-bets, all-ins at 12–80bb). After each answer it shows the full chart with your hand outlined. Data: `preflop-data.js`.
-- **Solver flop drill** (`solver.html`): BTN vs BB at 50, 30 and 20bb, plus HJ vs BB and BB vs SB at 50bb; single-raised pots, 30 solved flops each. A setting limits deals to hands the preflop chart plays at least half the time. After each answer, a "why" panel describes your hand (made hand, draws, backdoor flush draws), compares the same hand in other suits, and shows how the range plays each hand type (strong made hands, strong draws, marginal made hands, weak draws, air). `solver.html?hand=sb-bb-50/9d8d6s/root/Ks5d` opens a specific hand. The play panel shows who has the range advantage and the nut advantage, using the checklist's measures on the solver's starting ranges for that flop (a setting can hide them until you answer). You're the raiser deciding whether to c-bet, BB after SB checks, or BB facing a ⅓- or ¾-pot c-bet, and you're graded by EV loss against a GTO solver. Data: `solver-data/`.
+- **Solver flop drill** (`solver.html`): BTN vs BB at 50, 30 and 20bb, plus HJ vs BB, BB vs SB, CO vs BTN (BTN flats) and BB 3-bet vs BTN at 50bb; single-raised pots, 30 solved flops each. A setting limits deals to hands the preflop chart plays at least half the time. After each answer, a "why" panel describes your hand (made hand, draws, backdoor flush draws), compares the same hand in other suits, and shows how the range plays each hand type (strong made hands, strong draws, marginal made hands, weak draws, air). `solver.html?hand=sb-bb-50/9d8d6s/root/Ks5d` opens a specific hand. The play panel shows who has the range advantage and the nut advantage, using the checklist's measures on the solver's starting ranges for that flop (a setting can hide them until you answer). You're the raiser deciding whether to c-bet, BB after SB checks, or BB facing a ⅓- or ¾-pot c-bet, and you're graded by EV loss against a GTO solver. Data: `solver-data/`.
 
 A static web app for drilling a seven-question postflop checklist for MTT no-limit hold'em:
 
@@ -76,6 +76,8 @@ python3 ../tools/pack_solves.py ../solves ../solver-data/btn-bb-50 btn-bb-50 "BT
 # raiser out of position (SB vs BB): ranges line 1 = BB, line 2 = SB, and give SB both c-bet sizes
 FLOP_OOP="33%, 75%" ./target/release/examples/export_flops ranges_bb_sb.txt 80 465 ../solves-sb Ks7d2c ...
 python3 ../tools/pack_solves.py ../solves-sb ../solver-data/sb-bb-50 sb-bb-50 "BB vs SB, 50bb" BB SB
+# optional last argument: the ranges file, stored in index.json for the main-range filter
+# (used for spots whose ranges are not plain open/call charts, e.g. 3-bet pots)
 # then add the spot id to SPOTS at the top of solver.js
 ```
 

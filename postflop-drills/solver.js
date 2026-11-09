@@ -10,12 +10,22 @@
     { id: 'btn-bb-20', name: 'BTN vs BB', depth: 20, raiser: 'BTN', caller: 'BB', open: 2 },
     { id: 'hj-bb-50', name: 'HJ vs BB', depth: 50, raiser: 'HJ', caller: 'BB', open: 2.2 },
     { id: 'sb-bb-50', name: 'BB vs SB', depth: 50, raiser: 'SB', caller: 'BB', open: 3.5 },
+    { id: 'co-btn-50', name: 'CO vs BTN', depth: 50, raiser: 'CO', caller: 'BTN', open: 2.2 },
+    {
+      id: 'bb3-btn-50', name: 'BB 3-bet vs BTN', depth: 50, raiser: 'BB', caller: 'BTN', open: 8.8,
+      pre: { raiser: 'BTN opens 2.2bb, <b>you (BB)</b> 3-bet to 8.8bb, BTN calls.', caller: '<b>You (BTN)</b> open 2.2bb, BB 3-bets to 8.8bb, you call.' },
+    },
   ];
   SPOTS.forEach((sp) => { sp.label = `${sp.name} ${sp.depth}bb`; });
 
   // Preflop frequency (0-1) of a hand class for the hero's preflop action in this spot,
   // from the chart data (ranges-data.js). Null when the chart is unavailable.
-  function preflopFreq(sp, heroIsRaiser, cls) {
+  function preflopFreq(sp, heroIsRaiser, cls, index, heroIP) {
+    if (index && index.pfIP) {
+      // spots packed with their ranges carry per-class weights (e.g. 3-bet pots)
+      const m = heroIP ? index.pfIP : index.pfOOP;
+      return m[cls] || 0;
+    }
     const D = window.PF_RANGE_DATA;
     const d = D && D.depths[String(sp.depth)];
     if (!d) return null;
@@ -72,10 +82,11 @@
       out.spots = Array.from(new Set(out.spots.concat(['sb-bb-50'])));
     }
     if ((s.v || 1) < 3) out.spots = Array.from(new Set(out.spots.concat(['btn-bb-30', 'btn-bb-20'])));
+    if ((s.v || 1) < 4) out.spots = Array.from(new Set(out.spots.concat(['co-btn-50', 'bb3-btn-50'])));
     if (out.mainOnly == null) out.mainOnly = false;
     if (out.showAdv == null) out.showAdv = true;
     out.types = Object.keys(TYPES).filter((t) => out.types.includes(t));
-    out.v = 3;
+    out.v = 4;
     return out;
   }
   const fmt = (x) => (Math.round(x * 100) / 100).toFixed(2);
@@ -161,8 +172,9 @@
     // the hero's preflop chart plays at least half the time
     let entries = Object.entries(node.hands);
     if (state.settings.mainOnly) {
-      const heroIsRaiser = (node.player === 'IP' ? index.ip : index.oop) === spot.raiser;
-      const main = entries.filter(([c]) => { const f = preflopFreq(spot, heroIsRaiser, handClass(c)); return f == null || f >= 0.5; });
+      const heroIP = node.player === 'IP';
+      const heroIsRaiser = (heroIP ? index.ip : index.oop) === spot.raiser;
+      const main = entries.filter(([c]) => { const f = preflopFreq(spot, heroIsRaiser, handClass(c), index, heroIP); return f == null || f >= 0.5; });
       if (main.length) entries = main;
     }
     let total = 0;
@@ -186,7 +198,7 @@
     $('#depthChip').textContent = Math.round(flop.stack + sp.open) + 'bb deep';
     $('#pot').textContent = node.pot.toFixed(1) + 'bb';
     const verb = sp.raiser === 'SB' ? 'raise' : 'open';
-    const preflop = hero === sp.raiser
+    const preflop = sp.pre ? sp.pre[hero === sp.raiser ? 'raiser' : 'caller'] : hero === sp.raiser
       ? `<b>You (${sp.raiser})</b> ${verb} to ${sp.open}bb, ${sp.caller} calls.`
       : `${sp.raiser} ${verb}s to ${sp.open}bb, <b>you (${sp.caller})</b> call.`;
     const betText = (from, i) => actionText(flop.nodes[from].actions.filter((a) => /^Bet/.test(a))[i], flop.pot).replace('Bet', 'bets');
