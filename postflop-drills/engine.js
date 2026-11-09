@@ -480,6 +480,43 @@
     return { tier, label, nutty: !!(made && made.nutty), alsoAccept, reason };
   }
 
+  /**
+   * Backdoor flush draw: exactly three cards of one suit on the flop, at least one of them
+   * in the hand (needs that suit on both turn and river). level: 'nut' when the hand holds
+   * the best missing card of the suit, 'second' for the next one, otherwise 'weak'.
+   */
+  function backdoorFlush(hole, board) {
+    for (let s = 0; s < 4; s++) {
+      const mine = hole.filter((c) => sOf(c) === s).map(rOf);
+      const onBoard = board.filter((c) => sOf(c) === s).map(rOf);
+      if (!mine.length || mine.length + onBoard.length !== 3) continue;
+      const missing = [];
+      for (let r = 14; r >= 2; r--) if (!onBoard.includes(r)) missing.push(r);
+      const pos = missing.indexOf(Math.max(...mine));
+      return { suit: s, rank: Math.max(...mine), level: pos === 0 ? 'nut' : pos === 1 ? 'second' : 'weak' };
+    }
+    return null;
+  }
+
+  const HAND_GROUPS = {
+    strong: 'Strong made hands',
+    draw: 'Strong draws',
+    marginal: 'Marginal made hands',
+    weakdraw: 'Weak draws (gutshots, backdoor flush draws)',
+    air: 'Air (no pair, no draw)',
+  };
+
+  /** classify() plus backdoor flush draws, grouped for explaining solver strategies. */
+  function handFeatures(hole, board) {
+    const cls = classify(hole, board);
+    const bd = backdoorFlush(hole, board);
+    let group = { premium: 'strong', draw: 'draw', marginal: 'marginal', air: 'air' }[cls.tier];
+    if (group === 'air' && (bd || /^Gutshot/.test(cls.label))) group = 'weakdraw';
+    let label = cls.label;
+    if (bd && group !== 'strong' && group !== 'draw') label += ` + ${bd.level === 'nut' ? 'nut' : bd.level === 'second' ? 'second-nut' : rankChar(bd.rank) + '-high'} backdoor flush draw`;
+    return { tier: cls.tier, group, label, backdoor: bd };
+  }
+
   // ---------------------------------------------------------------- range stats
   function rangeStats(combos, board) {
     const dead = new Set(board);
@@ -787,6 +824,7 @@
     RANKS, SUITS, RANGES, TIERS, QUESTION_IDS, POSTFLOP_ORDER, PREFLOP_ORDER,
     cardId, rOf, sOf, cardStr, parseCard, rankChar,
     parseRange, rangeCombos, evaluate, catOf, texture, describeBoard, classify,
+    backdoorFlush, handFeatures, HAND_GROUPS,
     rangeStats, rangeEquity, nutStats, availableDepths, spotsFor, generateScenario, isCorrect, setSeed,
   };
   root.PFEngine = api;

@@ -132,3 +132,21 @@ console.log(n + ' test groups passed');
     assert.strictEqual(s20.depth, '20');
   }
 }
+
+// backdoor flush draws and hand groups (solver drill explanations)
+{
+  const b = (s) => s.match(/../g).map(E.parseCard);
+  const f = (h, bd) => E.handFeatures(b(h), b(bd));
+  assert.strictEqual(E.backdoorFlush(b('Kd5c'), b('9d8d6s')).level, 'second');
+  assert.strictEqual(E.backdoorFlush(b('Ad2c'), b('9d8d6s')).level, 'nut');
+  assert.strictEqual(E.backdoorFlush(b('Ks5d'), b('9d8d6s')).level, 'weak');
+  assert.strictEqual(E.backdoorFlush(b('Ks5c'), b('9d8d6s')), null);
+  assert.strictEqual(E.backdoorFlush(b('AhKh'), b('Qh7c2s')).level, 'nut'); // two in hand + one on board
+  assert.strictEqual(E.backdoorFlush(b('AdTd'), b('9d8d6s')), null); // that's a real flush draw
+  assert.strictEqual(f('Ks5c', '9d8d6s').group, 'weakdraw'); // gutshot
+  assert.strictEqual(f('Ks4c', '9d8d6s').group, 'air');
+  assert.strictEqual(f('AdTd', '9d8d6s').group, 'draw');
+  assert.strictEqual(f('7c5h', '9d8d6s').group, 'strong');
+  assert.ok(/second-nut backdoor/.test(f('Kd5c', '9d8d6s').label));
+  console.log('hand features ok');
+}

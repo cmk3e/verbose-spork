@@ -138,10 +138,20 @@
     let avSpots = loadedSpots().filter((x) => state.settings.spots.includes(x.id) && namesFor(x).length);
     if (!avSpots.length) avSpots = loadedSpots().filter((x) => namesFor(x).length);
     if (!avSpots.length) avSpots = loadedSpots();
-    const spot = avSpots[rand(avSpots.length)];
+    // ?hand=<spot>/<flop>/<node>/<combo> opens one specific hand (first deal only)
+    const forced = !state.forcedDone && (new URLSearchParams(location.search).get('hand') || '').split('/');
+    state.forcedDone = true;
+    const fSpot = forced && forced.length === 4 && loadedSpots().find((x) => x.id === forced[0]);
+    const spot = fSpot || avSpots[rand(avSpots.length)];
     const index = state.indexes[spot.id];
-    const flopName = index.flops[rand(index.flops.length)];
+    const flopName = fSpot && index.flops.includes(forced[1]) ? forced[1] : index.flops[rand(index.flops.length)];
     const flop = await loadFlop(spot.id, flopName);
+    if (fSpot && flop.nodes[forced[2]] && flop.nodes[forced[2]].hands[forced[3]]) {
+      Object.assign(state, { spot, index, flop, nodeName: forced[2], node: flop.nodes[forced[2]], combo: forced[3], answered: false });
+      state.session.hands++;
+      render();
+      return;
+    }
     let avail = namesFor(spot).filter((n) => flop.nodes[n] && betUsed(flop, n));
     if (!avail.length) avail = Object.keys(drillNodes(spot, index)).filter((n) => flop.nodes[n]);
     const nodeName = avail[rand(avail.length)];
@@ -247,22 +257,141 @@
         <td class="num">${evs[j] >= best - 0.005 ? 'best' : '−' + fmt(best - evs[j])}</td>`;
       tbody.appendChild(tr);
     });
-    $('#explain').textContent = `${combo.slice(0, 2)} ${combo.slice(2)}: the solver's mix for this exact hand and what each choice is worth.`;
+    $('#explain').textContent = '';
+    try { renderWhy(i, freqs, evs, loss); } catch (e) { $('#why').innerHTML = ''; }
     $('#feedback').hidden = false;
     renderRange();
     renderScore();
     $('#next').focus();
   }
 
+  // ------------------------------------------------------------ explanation
+  const prettyCombo = (c) => c[0].replace('T', '10') + SUIT_SYM[c[1]] + c[2].replace('T', '10') + SUIT_SYM[c[3]];
+  const kindOf = (a) => (/^(Bet|Raise|All-in)/.test(a) ? 'aggr' : a === 'Fold' ? 'fold' : 'passive');
+  const shortAct = (a, pot) => {
+    const m = a.match(/^Bet ([\d.]+)$/);
+    if (m) {
+      const pc = Math.round((+m[1] / pot) * 100);
+      const frac = pc >= 31 && pc <= 35 ? '⅓' : pc >= 64 && pc <= 68 ? '⅔' : pc >= 73 && pc <= 77 ? '¾' : pc + '%';
+      return `Bet ${frac} pot`;
+    }
+    return a.replace(/ [\d.]+$/, '');
+  };
+  const mixText = (f, actions, pot) => actions.map((a, j) => [shortAct(a, pot), Math.round(f[j])]).filter(([, x]) => x >= 1).map(([a, x]) => `${a} ${x}%`).join(' · ');
+
+  // Why-text for the dominant kind of action a hand group takes. {a} = bet/raise, {p} = check/call.
+  const RATIONALE = {
+    strong: { aggr: 'Strong made hands mostly {a} for value and to charge draws.', passive: 'Strong made hands often {p} here: they keep worse hands in and protect your {p}ing range.' },
+    draw: { aggr: 'Strong draws like to {a} as semi-bluffs: they can win the pot right away and still have lots of equity when called.', passive: 'Strong draws can {p}: they have enough equity to continue without growing the pot.', fold: 'Even strong draws fold here: the price is too high for the equity.' },
+    marginal: { aggr: 'Marginal made hands {a} here for thin value and protection.', passive: 'Marginal made hands mostly {p}: they have showdown value but don\'t want a big pot.', fold: 'Marginal made hands often fold to this bet: they rarely beat the hands that bet this way.' },
+    weakdraw: { aggr: 'Weak draws make the best bluffs: they seldom win at showdown, but they have outs when called.', passive: 'Weak draws mostly {p} to see the next card cheaply.', fold: 'Weak draws often fold: the price is too high for the outs they have.' },
+    air: { aggr: 'Even pure air {a}s some of the time here as a bluff.', passive: 'Hands with no pair and no draw mostly give up and {p}.', fold: 'Hands with no pair and no draw fold.' },
+  };
+
+  function renderWhy(picked, freqs, evs, loss) {
+    const { node, combo, flop } = state;
+    const box = $('#why');
+    box.innerHTML = '';
+    if (!E || !E.handFeatures) return;
+    const k = node.actions.length;
+    const facing = node.actions.includes('Fold');
+    const verbs = { a: facing ? 'raise' : 'bet', p: facing ? 'call' : 'check' };
+    const board = flop.flop.match(/../g).map(E.parseCard);
+    const toCards = (c) => [E.parseCard(c.slice(0, 2)), E.parseCard(c.slice(2))];
+    const hero = E.handFeatures(toCards(combo), board);
+    const heroCls = handClass(combo);
+
+    // aggregate the range by hand group, and the hero's hand class by exact features
+    const groups = {}, sib = {};
+    let W = 0;
+    for (const [c, v] of Object.entries(node.hands)) {
+      const f = E.handFeatures(toCards(c), board);
+      const g = groups[f.group] || (groups[f.group] = { w: 0, f: new Array(k).fill(0) });
+      g.w += v[0]; W += v[0];
+      for (let j = 0; j < k; j++) g.f[j] += v[0] * v[1 + j];
+      if (handClass(c) === heroCls) {
+        const s = sib[f.label] || (sib[f.label] = { w: 0, f: new Array(k).fill(0), combos: [] });
+        s.w += v[0]; s.combos.push(c);
+        for (let j = 0; j < k; j++) s.f[j] += v[0] * v[1 + j];
+      }
+    }
+    const norm = (g) => g.f.map((x) => x / g.w);
+    const kindMix = (f) => {
+      const m = { aggr: 0, passive: 0, fold: 0 };
+      node.actions.forEach((a, j) => { m[kindOf(a)] += f[j]; });
+      return m;
+    };
+    const topKind = (m) => Object.keys(m).sort((x, y) => m[y] - m[x])[0];
+
+    const parts = [];
+    parts.push(`<p><b>Your hand:</b> ${hero.label}.</p>`);
+
+    // EV context
+    const spread = Math.max(...evs) - Math.min(...evs);
+    if (spread <= Math.max(0.05, node.pot * 0.01)) {
+      parts.push(`<p>Every option is within ${fmt(spread)}bb here, so the solver is close to indifferent and mixes. Any of them is fine.</p>`);
+    } else if (loss > 0.005) {
+      parts.push(`<p>Your choice gives up ${fmt(loss)}bb (${((loss / node.pot) * 100).toFixed(1)}% of the pot) compared with the best play.</p>`);
+    }
+
+    // what hands like this do, and why
+    const hg = groups[hero.group];
+    if (hg) {
+      const gm = kindMix(norm(hg));
+      const gk = topKind(gm);
+      const text = (RATIONALE[hero.group][gk] || '').replace(/\{a\}/g, verbs.a).replace(/\{p\}/g, verbs.p);
+      if (text) parts.push(`<p><b>${E.HAND_GROUPS[hero.group]}:</b> ${mixText(norm(hg), node.actions, node.pot)}. ${text}</p>`);
+      const mine = kindMix(freqs);
+      if (topKind(mine) !== gk && Math.abs(mine[gk] - gm[gk]) > 30) {
+        parts.push(`<p>Your exact combo plays differently from most hands of its type. Compare it with the same hand in other suits below.</p>`);
+      }
+    }
+
+    // same hand class, other suits (only when the suits change the strategy)
+    const sibRows = Object.entries(sib).map(([label, g]) => ({ label, g, f: norm(g) }));
+    const differs = sibRows.length > 1 && node.actions.some((_, j) => {
+      const xs = sibRows.map((r) => r.f[j]);
+      return Math.max(...xs) - Math.min(...xs) >= 25;
+    });
+    if (differs) {
+      sibRows.sort((x, y) => kindMix(y.f).aggr - kindMix(x.f).aggr);
+      const rows = sibRows.map((r) => {
+        const isMine = r.g.combos.includes(combo);
+        const list = r.g.combos.slice(0, 4).map(prettyCombo).join(', ') + (r.g.combos.length > 4 ? '…' : '');
+        return `<li${isMine ? ' class="mine"' : ''}><span>${r.label}<small>${list}</small></span><b>${mixText(r.f, node.actions, node.pot)}</b></li>`;
+      }).join('');
+      parts.push(`<p class="why-h">Same hand, other suits</p><ul class="sibs">${rows}</ul>`);
+    }
+
+    // range by hand group
+    const order = Object.keys(E.HAND_GROUPS).filter((g) => groups[g]);
+    const rows = order.map((g) => {
+      const f = norm(groups[g]);
+      let x = 0;
+      const stops = [];
+      for (let j = 0; j < k; j++) { const q = f[j] / 100; if (q > 0) { stops.push(`${actionColor(node, j)} ${x * 100}% ${(x + q) * 100}%`); x += q; } }
+      return `<tr${g === hero.group ? ' class="mine"' : ''}><td>${E.HAND_GROUPS[g]}</td><td class="num">${Math.round((groups[g].w / W) * 100)}%</td>
+        <td class="mixcell"><div class="mixbar" style="background:linear-gradient(90deg, ${stops.join(', ')})"></div><small>${mixText(f, node.actions, node.pot)}</small></td></tr>`;
+    }).join('');
+    const who = node.player === 'IP' ? state.index.ip : state.index.oop;
+    parts.push(`<p class="why-h">How ${who} plays each hand type here</p>
+      <table class="stats grouptable"><thead><tr><th>Hand type</th><th class="num">Range</th><th>Solver mix</th></tr></thead><tbody>${rows}</tbody></table>`);
+    box.innerHTML = parts.join('');
+  }
+
   const ACT_COLORS = (a) => (a === 'Check' ? 'var(--act-call)' : a === 'Call' ? 'var(--act-call)' : a === 'Fold' ? 'var(--act-fold)' : null);
+
+  function actionColor(node, j) {
+    const aggr = node.actions.map((a, i) => ({ a, i })).filter((x) => !ACT_COLORS(x.a));
+    const reds = ['#f08a7e', '#e5483f', '#a32620', '#7a1d1a'];
+    return ACT_COLORS(node.actions[j]) || reds[aggr.findIndex((x) => x.i === j) + (aggr.length === 1 ? 1 : 0)];
+  }
 
   function renderRange() {
     const { node, combo } = state;
     const k = node.actions.length;
     // colours: check/call green, fold blue, bets/raises from light to dark red
-    const aggr = node.actions.map((a, j) => ({ a, j })).filter((x) => !ACT_COLORS(x.a));
-    const reds = ['#f08a7e', '#e5483f', '#a32620', '#7a1d1a'];
-    const color = (j) => ACT_COLORS(node.actions[j]) || reds[aggr.findIndex((x) => x.j === j) + (aggr.length === 1 ? 1 : 0)];
+    const color = (j) => actionColor(node, j);
 
     const cls = new Array(169).fill(null).map(() => ({ w: 0, f: new Array(k).fill(0) }));
     const tot = new Array(k).fill(0);

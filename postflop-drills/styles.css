@@ -278,3 +278,21 @@ footer { color: var(--muted); font-size: .78rem; max-width: 65ch; }
 .evtable th { text-align: left; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; padding: 4px 0; }
 .evtable th.num, .evtable td.num { text-align: right; padding-left: 12px; }
 .evtable tr.mine td { font-weight: 700; }
+
+/* solver drill: why-explanations */
+.why { display: grid; gap: 8px; margin: 4px 0 6px; font-size: .92rem; }
+.why p { margin: 0; max-width: 70ch; }
+.why .why-h { margin-top: 6px; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+.sibs { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.sibs li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
+.sibs li.mine { border-color: currentColor; }
+.sibs li span { display: grid; gap: 2px; }
+.sibs li small { color: var(--muted); font-size: .8rem; }
+.sibs li b { font-weight: 600; text-align: right; font-size: .85rem; white-space: nowrap; }
+.grouptable th { text-align: left; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; padding: 4px 0; }
+.grouptable th.num, .grouptable td.num { text-align: right; padding: 6px 12px 6px 8px; }
+.grouptable tr.mine td:first-child { font-weight: 700; }
+.mixcell { width: 45%; }
+.mixbar { height: 10px; border-radius: 3px; margin-bottom: 3px; }
+.mixcell small { color: var(--muted); font-size: .75rem; }
+@media (max-width: 520px) { .sibs li { flex-direction: column; gap: 4px; } .sibs li b { text-align: left; white-space: normal; } }
