@@ -44,6 +44,8 @@ for f in sorted(glob.glob(os.path.join(src, '*.json'))):
             freqs = [int(v[1 + 2 * a]) for a in range(k)]
             evs = [round(v[2 + 2 * a], 2) for a in range(k)]
             hands[combo] = [round(w, 3)] + freqs + evs
+        if not hands:
+            continue  # every combo had ~zero reach
         nodes[name] = {'player': n['player'], 'pot': n['pot'], 'actions': n['actions'], 'hands': hands}
     packed = {'flop': d['flop'], 'pot': d['pot'], 'stack': d['stack'], 'exploitability': d['exploitability'], 'nodes': nodes}
     with open(os.path.join(out, d['flop'] + '.json'), 'w') as fh:
