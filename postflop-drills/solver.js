@@ -51,7 +51,7 @@
   const rand = (n) => Math.floor(Math.random() * n);
 
   const state = {
-    indexes: {}, spot: null, index: null, cache: {}, flop: null, nodeName: null, node: null, combo: null, answered: false,
+    indexes: {}, adv: {}, spot: null, index: null, cache: {}, flop: null, nodeName: null, node: null, combo: null, answered: false,
     settings: migrateSettings(store.get('settings', {})),
     stats: migrateStats(store.get('stats', {})),
     session: { right: 0, total: 0, streak: 0, hands: 0, evLoss: 0 },
@@ -73,6 +73,7 @@
     }
     if ((s.v || 1) < 3) out.spots = Array.from(new Set(out.spots.concat(['btn-bb-30', 'btn-bb-20'])));
     if (out.mainOnly == null) out.mainOnly = false;
+    if (out.showAdv == null) out.showAdv = true;
     out.types = Object.keys(TYPES).filter((t) => out.types.includes(t));
     out.v = 3;
     return out;
@@ -213,6 +214,7 @@
     });
     $('#feedback').hidden = true;
     $('#chartWrap').hidden = true;
+    renderAdv();
     renderScore();
   }
 
@@ -260,9 +262,63 @@
     $('#explain').textContent = '';
     try { renderWhy(i, freqs, evs, loss); } catch (e) { $('#why').innerHTML = ''; }
     $('#feedback').hidden = false;
+    $('#adv').hidden = false;
     renderRange();
     renderScore();
     $('#next').focus();
+  }
+
+  // ------------------------------------------------------------ range / nut advantage
+  // Same measures and thresholds as the flop checklist: whole-range equity (53%+ is an
+  // edge) and each range's share of the strongest 5% of hands (1.3x and 1.5 points apart).
+  // Starting ranges come from the solve: OOP = root node, IP = the node after OOP checks.
+  function advantages() {
+    const { flop, spot, index } = state;
+    const key = spot.id + '/' + flop.flop;
+    if (state.adv[key]) return state.adv[key];
+    if (!E || !E.rangeEquity || !flop.nodes.root || !flop.nodes.x) return null;
+    const toRange = (hands) => Object.entries(hands).map(([c, v]) => {
+      const h = [E.parseCard(c.slice(0, 2)), E.parseCard(c.slice(2))];
+      h.w = v[0];
+      return h;
+    });
+    const board = flop.flop.match(/../g).map(E.parseCard);
+    const oop = toRange(flop.nodes.root.hands), ip = toRange(flop.nodes.x.hands);
+    const eqIP = E.rangeEquity(ip, oop, board, 5000);
+    const nuts = E.nutStats(ip, oop, board, 0.05);
+    const side = (a, b, ratio, minDiff) => {
+      const hi = Math.max(a, b), lo = Math.min(a, b);
+      if (hi - lo < minDiff) return null;
+      if (lo === 0 ? hi > 0 : hi / lo >= ratio) return a > b ? 'ip' : 'oop';
+      return null;
+    };
+    const res = {
+      ip: index.ip, oop: index.oop, eqIP,
+      range: eqIP >= 0.53 ? 'ip' : eqIP <= 0.47 ? 'oop' : null,
+      nutIP: nuts.aFrac, nutOOP: nuts.bFrac, nutCut: nuts.cutLabel,
+      nut: side(nuts.aFrac, nuts.bFrac, 1.3, 0.015),
+    };
+    state.adv[key] = res;
+    return res;
+  }
+
+  function renderAdv() {
+    const box = $('#adv');
+    let a = null;
+    try { a = advantages(); } catch (e) { a = null; }
+    if (!a) { box.hidden = true; return; }
+    const heroSide = state.node.player === 'IP' ? 'ip' : 'oop';
+    const who = (sd) => (sd === heroSide ? `You (${a[sd]})` : a[sd]);
+    const pc = (x) => Math.round(x * 100) + '%';
+    const eqHero = heroSide === 'ip' ? a.eqIP : 1 - a.eqIP;
+    const nutHero = heroSide === 'ip' ? a.nutIP : a.nutOOP, nutOpp = heroSide === 'ip' ? a.nutOOP : a.nutIP;
+    const opp = heroSide === 'ip' ? a.oop : a.ip;
+    box.innerHTML = `
+      <div><span class="adv-k">Range advantage</span><b class="adv-v ${a.range === heroSide ? 'me' : a.range ? 'opp' : ''}">${a.range ? who(a.range) : 'Roughly even'}</b>
+        <small>Your range has ${pc(eqHero)} equity against ${opp}'s range.</small></div>
+      <div><span class="adv-k">Nut advantage</span><b class="adv-v ${a.nut === heroSide ? 'me' : a.nut ? 'opp' : ''}">${a.nut ? who(a.nut) : 'Roughly even'}</b>
+        <small>Top 5% of hands (about ${a.nutCut.replace(/ \(.*\)$/, '').toLowerCase()} or better): you ${pc(nutHero)} of your range, ${opp} ${pc(nutOpp)}.</small></div>`;
+    box.hidden = !state.settings.showAdv && !state.answered;
   }
 
   // ------------------------------------------------------------ explanation
@@ -454,6 +510,9 @@
         store.set('settings', state.settings);
       };
     });
+    const sa = $('#showAdv');
+    sa.checked = !!state.settings.showAdv;
+    sa.onchange = () => { state.settings.showAdv = sa.checked; store.set('settings', state.settings); if (!state.answered) $('#adv').hidden = !sa.checked; };
     const mo = $('#mainOnly');
     mo.checked = !!state.settings.mainOnly;
     mo.onchange = () => { state.settings.mainOnly = mo.checked; store.set('settings', state.settings); };

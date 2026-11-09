@@ -296,3 +296,13 @@ footer { color: var(--muted); font-size: .78rem; max-width: 65ch; }
 .mixbar { height: 10px; border-radius: 3px; margin-bottom: 3px; }
 .mixcell small { color: var(--muted); font-size: .75rem; }
 @media (max-width: 520px) { .sibs li { flex-direction: column; gap: 4px; } .sibs li b { text-align: left; white-space: normal; } }
+
+/* solver drill: range / nut advantage */
+.adv { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 2px 0 12px; }
+.adv > div { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
+.adv-k { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+.adv-v { font-size: 1rem; }
+.adv-v.me { color: var(--ok, #2f8f4e); }
+.adv-v.opp { color: var(--bad, #c0392b); }
+.adv small { color: var(--muted); font-size: .8rem; line-height: 1.35; }
+@media (max-width: 520px) { .adv { grid-template-columns: 1fr; } }
