@@ -1,4 +1,5 @@
-/* Preflop trainer. Depends on preflop-data.js (window.PF_PREFLOP_DATA). */
+/* Preflop trainer. Depends on preflop-data.js (window.PF_PREFLOP_DATA).
+ * Set window.PF_TRAINER_MODE = 'pushfold' before loading for the 12bb push/fold drill. */
 (function () {
   'use strict';
   const DATA = window.PF_PREFLOP_DATA;
@@ -8,7 +9,16 @@
   const SUIT_CLASS = ['s', 'h', 'd', 'c'];
   const ACTION_ORDER = ['fold', 'call', 'raise', 'allin'];
 
-  const TYPES = {
+  const PUSHFOLD = window.PF_TRAINER_MODE === 'pushfold';
+  const PF_DEPTH = '12';
+  const POSITIONS = ['UTG', 'UTG+1', 'LJ', 'HJ', 'CO', 'BTN', 'SB', 'BB'];
+  const TYPES = PUSHFOLD ? {
+    open: 'Open: shove, min-raise or fold',
+    rejam: 'Facing an open: rejam, call or fold',
+    callShove: 'Facing an open-shove: call or fold',
+    vsRejam: 'You opened and got rejammed: call or fold',
+    vsLimp: 'BB vs SB limp',
+  } : {
     rfi: 'Open (folded to you)',
     vsOpen: 'Facing an open',
     vsLimp: 'Facing a limp',
@@ -17,9 +27,19 @@
     vsShove: 'Facing an all-in',
   };
 
+  const PREFIX = PUSHFOLD ? 'ppf:' : 'pft:';
+  // drill category of a spot (push/fold mode groups the chart types differently)
+  function catOf(p) {
+    if (!PUSHFOLD) return p.type;
+    if (p.type === 'rfi') return 'open';
+    if (p.type === 'vsOpen') return 'rejam';
+    if (p.type === 'vsLimp') return 'vsLimp';
+    if (p.type === 'vsShove') return p.sub === 'open' ? 'callShove' : p.sub === '3bet' ? 'vsRejam' : null;
+    return null;
+  }
   const store = {
-    get(k, d) { try { const v = localStorage.getItem('pft:' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
-    set(k, v) { try { localStorage.setItem('pft:' + k, JSON.stringify(v)); } catch (e) { /* ignore */ } },
+    get(k, d) { try { const v = localStorage.getItem(PREFIX + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem(PREFIX + k, JSON.stringify(v)); } catch (e) { /* ignore */ } },
   };
 
   const $ = (s) => document.querySelector(s);
@@ -43,12 +63,16 @@
 
   const ALL_SPOTS = [];
   for (const depth of Object.keys(DATA.depths)) {
+    if (PUSHFOLD && depth !== PF_DEPTH) continue;
     const D = DATA.depths[depth];
     for (const title of Object.keys(D.charts)) {
       const p = parseTitle(title);
       if (!p) continue;
+      p.cat = catOf(p);
+      if (!p.cat) continue;
       const chart = D.charts[title];
-      const acts = ACTION_ORDER.filter((a) => chart[a]);
+      // actions the chart actually uses (e.g. BB never folds to a limp)
+      const acts = ACTION_ORDER.filter((a) => chart[a] && /[1-9a-k]/.test(chart[a]));
       // per-hand frequencies
       const freqs = ORDER.map((h, i) => {
         const f = {};
@@ -56,19 +80,32 @@
         for (const a of acts) { f[a] = DIG.indexOf(chart[a][i]) / 20; any += f[a]; }
         return any > 0 ? f : null;
       });
-      ALL_SPOTS.push(Object.assign({ depth, title, acts, freqs, D }, p));
+      // share of all hands (by combos) taking each action, for the range summary
+      const share = {};
+      let inRange = 0;
+      ORDER.forEach((h, i) => {
+        const f = freqs[i];
+        if (!f) return;
+        const n = h.length === 2 ? 6 : h[2] === 's' ? 4 : 12;
+        inRange += n;
+        for (const a of acts) share[a] = (share[a] || 0) + n * f[a];
+      });
+      ALL_SPOTS.push(Object.assign({ depth, title, acts, freqs, D, share, inRange }, p));
     }
   }
 
   function actionLabel(spot, a) {
     const t = spot.type;
     if (a === 'fold') return 'Fold';
-    if (a === 'allin') return 'All-in';
+    if (a === 'allin') {
+      if (!PUSHFOLD) return 'All-in';
+      return t === 'vsOpen' ? `Rejam ${spot.depth}bb` : `Shove ${spot.depth}bb`;
+    }
     if (a === 'call') return t === 'rfi' ? 'Limp' : t === 'vsLimp' ? 'Check' : 'Call';
     // raise
     if (t === 'rfi') {
       const size = spot.hero === 'SB' ? spot.D.sbOpenSize : spot.D.openSize;
-      return size ? `Raise ${size}bb` : 'Raise';
+      return size ? `Raise ${size}bb` : PUSHFOLD ? 'Min-raise' : 'Raise';
     }
     if (t === 'vsOpen') return '3-bet';
     if (t === 'vs3bet') return '4-bet';
@@ -86,12 +123,16 @@
     switch (type) {
       case 'rfi': return `Folds to you in the <b>${h}</b>.`;
       case 'vsLimp': return `SB limps. Your option in the <b>BB</b>.`;
-      case 'vsOpen': return `${v} opens to ${openSize(spot, v)}. Folds to you in the <b>${h}</b>.`;
+      case 'vsOpen': return PUSHFOLD && !spot.D.openSize
+        ? `${v} min-raises. Folds to you in the <b>${h}</b>.`
+        : `${v} opens to ${openSize(spot, v)}. Folds to you in the <b>${h}</b>.`;
       case 'vs3bet': return `You open from the <b>${h}</b> and ${v} 3-bets. Action is back on you.`;
       case 'vs4bet': return `${v} opens, you 3-bet from the <b>${h}</b>, and ${v} 4-bets. Action is on you.`;
       case 'vsShove':
         if (spot.sub === 'open') return `${v} opens all-in for ${depth}bb. Folds to you in the <b>${h}</b>.`;
-        if (spot.sub === '3bet') return `You open from the <b>${h}</b> and ${v} 3-bets all-in.`;
+        if (spot.sub === '3bet') return PUSHFOLD
+          ? `You min-raise from the <b>${h}</b> and ${v} rejams all-in for ${depth}bb.`
+          : `You open from the <b>${h}</b> and ${v} 3-bets all-in.`;
         return `${v} opens, you 3-bet from the <b>${h}</b>, and ${v} 4-bets all-in.`;
     }
     return '';
@@ -99,7 +140,7 @@
 
   // ------------------------------------------------------------ state
   const state = {
-    settings: Object.assign({ depth: 'any', types: Object.keys(TYPES) }, store.get('settings', {})),
+    settings: Object.assign({ depth: PUSHFOLD ? PF_DEPTH : 'any', types: Object.keys(TYPES), positions: POSITIONS.slice() }, store.get('settings', {})),
     stats: store.get('stats', {}),
     session: { right: 0, total: 0, streak: 0, hands: 0 },
     spot: null, handIdx: 0, cards: null, answered: false,
@@ -107,8 +148,9 @@
 
   function eligibleSpots() {
     return ALL_SPOTS.filter((s) =>
-      (state.settings.depth === 'any' || s.depth === state.settings.depth) &&
-      state.settings.types.includes(s.type));
+      (PUSHFOLD || state.settings.depth === 'any' || s.depth === state.settings.depth) &&
+      (!PUSHFOLD || state.settings.positions.includes(s.hero)) &&
+      state.settings.types.includes(s.cat));
   }
 
   function dealCards(hand) {
@@ -123,6 +165,11 @@
   function deal() {
     let spots = eligibleSpots();
     if (!spots.length) spots = ALL_SPOTS;
+    if (PUSHFOLD) {
+      // pick the kind of spot first so open shoves aren't swamped by the many facing-action charts
+      const cat = pick(Array.from(new Set(spots.map((x) => x.cat))));
+      spots = spots.filter((x) => x.cat === cat);
+    }
     const spot = pick(spots);
     // Deal hands in this spot's range; pure folds come up less often.
     const items = [];
@@ -154,7 +201,7 @@
 
   function render() {
     const s = state.spot;
-    $('#typeChip').textContent = TYPES[s.type];
+    $('#typeChip').textContent = TYPES[s.cat];
     $('#depthChip').textContent = s.depth + 'bb deep';
     $('#action').innerHTML = actionText(s);
     const hole = $('#hole');
@@ -192,9 +239,9 @@
     const v = verdict(f[a] || 0, best);
     state.session.total++;
     if (v.ok) { state.session.right++; state.session.streak++; } else state.session.streak = 0;
-    const st = state.stats[s.type] || { right: 0, total: 0 };
+    const st = state.stats[s.cat] || { right: 0, total: 0 };
     st.total++; if (v.ok) st.right++;
-    state.stats[s.type] = st;
+    state.stats[s.cat] = st;
     store.set('stats', state.stats);
 
     document.querySelectorAll('#options .opt').forEach((b) => {
@@ -208,6 +255,15 @@
     const parts = s.acts.filter((x) => (f[x] || 0) > 0).sort((x, y) => f[y] - f[x])
       .map((x) => `${actionLabel(s, x)} ${Math.round(f[x] * 100)}%`);
     $('#explain').textContent = `${ORDER[state.handIdx]} here: ${parts.join(' · ')}.`;
+    const sum = $('#rangeSummary');
+    if (sum) {
+      // e.g. "The whole chart: Shove 27% · Min-raise 11% · Fold 62% of hands"
+      const base = s.type === 'vsShove' && s.sub === '3bet' ? s.inRange : 1326;
+      const bits = s.acts.filter((x) => s.share[x] > 0).map((x) => `${actionLabel(s, x)} ${((s.share[x] / base) * 100).toFixed(1)}%`);
+      sum.textContent = base === 1326
+        ? `Whole chart: ${bits.join(' · ')} of all hands.`
+        : `Whole chart: ${bits.join(' · ')} of the hands you min-raise with.`;
+    }
     $('#feedback').hidden = false;
     renderChart();
     $('#next').focus();
@@ -240,7 +296,9 @@
       if (!s.acts.includes(a)) continue;
       legend.appendChild(el('span', 'lg', `<i style="background:var(--act-${a})"></i>${actionLabel(s, a)}`));
     }
-    $('#chartTitle').textContent = `${s.title.replace(' · ', ', ')} (${s.depth}bb)`;
+    $('#chartTitle').textContent = PUSHFOLD
+      ? `${s.hero}${s.villain ? ' vs ' + s.villain : ''} · ${TYPES[s.cat].split(':')[0]} (12bb chart)`
+      : `${s.title.replace(' · ', ', ')} (${s.depth}bb)`;
     $('#chartWrap').hidden = false;
   }
 
@@ -254,8 +312,25 @@
   function renderSettings() {
     const depths = Object.keys(DATA.depths).sort((a, b) => b - a);
     const dbox = $('#depthToggles');
-    dbox.innerHTML = '';
-    ['any'].concat(depths).forEach((d) => {
+    const pbox = $('#posToggles');
+    if (pbox) {
+      pbox.innerHTML = '';
+      POSITIONS.forEach((pos) => {
+        const lab = el('label', 'tog', `<input type="checkbox"><span>${pos}</span>`);
+        pbox.appendChild(lab);
+        const cb = lab.querySelector('input');
+        cb.checked = state.settings.positions.includes(pos);
+        cb.onchange = () => {
+          const set = new Set(state.settings.positions);
+          cb.checked ? set.add(pos) : set.delete(pos);
+          if (!set.size) { cb.checked = true; return; }
+          state.settings.positions = POSITIONS.filter((x) => set.has(x));
+          store.set('settings', state.settings);
+        };
+      });
+    }
+    if (dbox) dbox.innerHTML = '';
+    if (dbox) ['any'].concat(depths).forEach((d) => {
       const lab = el('label', 'tog', `<input type="radio" name="depth" id="pdepth-${d}" value="${d}"><span>${d === 'any' ? 'Mixed' : d + 'bb'}</span>`);
       dbox.appendChild(lab);
       const r = lab.querySelector('input');

@@ -1,5 +1,12 @@
 import json, sys
+import os
 ch = json.load(open(sys.argv[1]))
+# manual fixes for charts the PDF renders incorrectly (see chart_fixes.json)
+fixes = json.load(open(os.path.join(os.path.dirname(__file__), 'chart_fixes.json')))
+for c in ch:
+    f = fixes.get(c['depth'] + '|' + c['title'])
+    if f:
+        c['acts'], c['cells'] = f['acts'], f['cells']
 RANKS = 'AKQJT98765432'
 order = []
 for r in range(13):

@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>12bb Push/Fold</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=IBM+Plex+Mono:wght@500&family=Public+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap">
+  <nav class="nav" aria-label="Drills">
+    <a href="index.html">Flop checklist</a>
+    <a href="preflop.html">Preflop trainer</a>
+    <a href="pushfold.html" aria-current="page">12bb push/fold</a>
+    <a href="solver.html">Solver flop drill</a>
+  </nav>
+  <header>
+    <div class="brand">
+      <h1>12bb Push/Fold</h1>
+      <p>Open shoves, rejams over opens, calling shoves and calling rejams, from your 12bb charts.</p>
+    </div>
+    <div class="scoreboard" aria-live="polite">
+      <div><b id="score">0/0</b><span>Correct</span></div>
+      <div><b id="streak">0</b><span>Streak</span></div>
+      <div><b id="hands">0</b><span>Hands</span></div>
+    </div>
+  </header>
+
+  <section class="table" aria-label="Current hand">
+    <div class="spotline">
+      <div class="chips"><span class="chip role" id="typeChip">Open</span><span class="chip" id="depthChip">12bb deep</span></div>
+    </div>
+    <p class="action" id="action"></p>
+    <div class="felt-row">
+      <div class="felt-group"><span>Your hand <span class="handname" id="handName"></span></span><div class="cards" id="hole"></div></div>
+    </div>
+  </section>
+
+  <section class="panel" aria-live="polite">
+    <div class="eyebrow">Your play</div>
+    <div class="options" id="options"></div>
+    <div class="feedback" id="feedback" hidden>
+      <p class="verdict" id="verdict"></p>
+      <p class="explain" id="explain"></p>
+      <p class="note" id="rangeSummary"></p>
+      <button class="btn" id="next" type="button">Next hand</button>
+    </div>
+  </section>
+
+  <section class="panel" id="chartWrap" hidden>
+    <div class="eyebrow" id="chartTitle">Chart</div>
+    <div class="legendrow" id="gridLegend"></div>
+    <div class="gridwrap"><div class="grid" id="grid"></div></div>
+    <p class="note">Your hand is outlined. Split cells are mixed: the chart plays each action that share of the time.</p>
+  </section>
+
+  <details class="panel" id="settings">
+    <summary>Drill settings</summary>
+    <fieldset>
+      <legend>My position</legend>
+      <div class="toggles" id="posToggles"></div>
+    </fieldset>
+    <fieldset>
+      <legend>Spots to drill</legend>
+      <div class="toggles" id="typeToggles"></div>
+    </fieldset>
+    <div class="btnrow"><button class="btn ghost" id="deal" type="button">Deal a new hand now</button></div>
+  </details>
+
+  <details class="panel" id="statsBox">
+    <summary>My accuracy by spot</summary>
+    <table class="stats"><tbody id="statsBody"></tbody></table>
+    <div class="btnrow"><button class="btn ghost" id="resetStats" type="button">Reset accuracy</button></div>
+  </details>
+
+  <footer>
+    Strategies come from your PokerCoaching 12bb preflop charts (BB ante). Opens at 12bb are a min-raise or an all-in.
+    An answer counts as correct when the chart takes that action at least 15% of the time with this hand.
+    Keyboard: 1–4 to act, Enter for the next hand.
+  </footer>
+</div>
+<script>window.PF_TRAINER_MODE = 'pushfold';</script>
+<script src="preflop-data.js"></script>
+<script src="preflop.js"></script>
+</body>
+</html>
