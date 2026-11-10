@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Range Viewer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=IBM+Plex+Mono:wght@500&family=Public+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap wide">
+  <nav class="nav" aria-label="Drills">
+    <a href="index.html">Flop checklist</a>
+    <a href="preflop.html">Preflop trainer</a>
+    <a href="pushfold.html">12bb push/fold</a>
+    <a href="ranges.html" aria-current="page">Range viewer</a>
+    <a href="solver.html">Solver flop drill</a>
+    <a href="turn.html">Solver turn drill</a>
+  </nav>
+  <header>
+    <div class="brand">
+      <h1>Range Viewer</h1>
+      <p>Tap a seat to open, then tap a later seat to see how it responds. Ranges from your PokerCoaching charts.</p>
+    </div>
+    <label class="depthpick">Stack depth
+      <select id="depth"></select>
+    </label>
+  </header>
+
+  <section class="pokertable" aria-label="Table">
+    <div class="felt-oval">
+      <p class="table-hint" id="hint">Tap the seat that opens</p>
+      <div class="seats" id="seats"></div>
+    </div>
+  </section>
+
+  <section class="rv-charts" id="charts">
+    <div class="panel rv-chart" id="openPanel" hidden>
+      <div class="eyebrow" id="openTitle">Open range</div>
+      <div class="legendrow" id="openLegend"></div>
+      <div class="gridwrap"><div class="grid" id="openGrid"></div></div>
+    </div>
+    <div class="panel rv-chart" id="respPanel" hidden>
+      <div class="eyebrow" id="respTitle">Response</div>
+      <div class="legendrow" id="respLegend"></div>
+      <div class="gridwrap"><div class="grid" id="respGrid"></div></div>
+      <label class="tog rv-only"><input type="checkbox" id="callsOnly"><span>Highlight calls only</span></label>
+    </div>
+  </section>
+
+  <footer>
+    Percentages are shares of all 1,326 starting hands. Split cells are mixed strategies: the chart plays each action that share of the time.
+    The response chart is for the second seat when everyone in between has folded.
+  </footer>
+</div>
+<script src="preflop-data.js"></script>
+<script src="ranges-view.js"></script>
+</body>
+</html>

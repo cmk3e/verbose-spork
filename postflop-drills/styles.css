@@ -309,3 +309,48 @@ footer { color: var(--muted); font-size: .78rem; max-width: 65ch; }
 
 /* turn drill: gap before the turn card */
 .cards .turncard { margin-left: 10px; }
+
+/* range viewer */
+.wrap.wide { max-width: 1180px; }
+.depthpick { display: grid; gap: 4px; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+.depthpick select { font: inherit; font-size: 1rem; text-transform: none; letter-spacing: 0; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; min-width: 120px; }
+.pokertable { margin: 18px 0 16px; padding: 34px 28px; }
+.felt-oval {
+  position: relative; max-width: 640px; margin: 0 auto; aspect-ratio: 2.1 / 1;
+  background: radial-gradient(ellipse at center, var(--felt) 0%, var(--felt-deep) 100%);
+  border: 10px solid #5b3a22; border-radius: 999px; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .08), 0 6px 18px rgba(0, 0, 0, .18);
+}
+.table-hint { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; padding: 0 22%; text-align: center; color: var(--felt-ink); font-size: .9rem; }
+.seat {
+  position: absolute; transform: translate(-50%, -50%); min-width: 74px; padding: 6px 8px;
+  display: grid; gap: 1px; justify-items: center; cursor: pointer;
+  background: var(--surface); color: var(--ink); border: 2px solid var(--line); border-radius: 12px;
+  font: inherit; box-shadow: 0 2px 6px rgba(0, 0, 0, .18);
+}
+.seat b { font-size: .9rem; }
+.seat small { font-size: .68rem; color: var(--muted); }
+.seat:hover { border-color: var(--brass); }
+.seat:focus-visible { outline: 3px solid var(--brass); outline-offset: 2px; }
+.seat.is-opener { background: var(--act-raise); border-color: var(--act-raise); color: #fff; }
+.seat.is-resp { background: var(--act-call); border-color: var(--act-call); color: #fff; }
+.seat.is-opener small, .seat.is-resp small { color: rgba(255, 255, 255, .9); }
+.seat.is-folded { opacity: .45; }
+.seat.is-disabled { opacity: .45; cursor: default; }
+.seat .dealer { position: absolute; top: -9px; right: -9px; width: 20px; height: 20px; border-radius: 50%; background: #fff; color: #111; font-style: normal; font-size: .7rem; font-weight: 700; display: grid; place-items: center; border: 1px solid #999; }
+/* seats clockwise from top-left: UTG, UTG+1, LJ, HJ, CO, BTN, SB, BB */
+.seat-0 { left: 15%; top: 4%; } .seat-1 { left: 50%; top: -2%; } .seat-2 { left: 85%; top: 4%; } .seat-3 { left: 100%; top: 50%; }
+.seat-4 { left: 85%; top: 96%; } .seat-5 { left: 50%; top: 102%; } .seat-6 { left: 15%; top: 96%; } .seat-7 { left: 0%; top: 50%; }
+.rv-charts { display: grid; gap: 16px; }
+.rv-chart .grid { max-width: none; }
+.rv-only { margin-top: 10px; }
+.gcell.dim { opacity: .35; }
+@media (min-width: 900px) { .rv-charts.two { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 520px) {
+  .pokertable { padding: 30px 8px; }
+  .felt-oval { aspect-ratio: 1.45 / 1; border-width: 7px; }
+  .seat { min-width: 54px; padding: 4px 5px; border-radius: 9px; }
+  .seat b { font-size: .78rem; } .seat small { font-size: .6rem; }
+  .table-hint { font-size: .78rem; padding: 0 20%; }
+}
+.rv-chart { align-content: start; }
+@media (max-width: 520px) { .pokertable { padding: 30px 36px; } }
