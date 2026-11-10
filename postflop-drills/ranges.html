@@ -38,6 +38,17 @@
     </div>
   </section>
 
+  <section class="panel rv-flop" id="flopPanel" hidden>
+    <div class="rv-flop-head">
+      <label class="depthpick">Flop
+        <select id="flop"><option value="">Choose a flop…</option></select>
+      </label>
+      <div class="cards" id="flopCards"></div>
+    </div>
+    <p class="note" id="flopNote"></p>
+    <div class="adv" id="flopAdv" hidden></div>
+  </section>
+
   <section class="rv-charts" id="charts">
     <div class="panel rv-chart" id="openPanel" hidden>
       <div class="eyebrow" id="openTitle">Open range</div>
@@ -55,9 +66,12 @@
   <footer>
     Percentages are shares of all 1,326 starting hands. Split cells are mixed strategies: the chart plays each action that share of the time.
     The response chart is for the second seat when everyone in between has folded.
+    Flop advantages use the opener's raising range and the responder's calling range (each weighted by its chart frequency, with the flop cards removed):
+    range advantage = 53%+ whole-range equity; nut advantage = a clearly bigger share of each range in the strongest 5% of hands on the flop.
   </footer>
 </div>
 <script src="preflop-data.js"></script>
+<script src="engine.js"></script>
 <script src="ranges-view.js"></script>
 </body>
 </html>

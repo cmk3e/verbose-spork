@@ -2,6 +2,13 @@
 (function () {
   'use strict';
   const DATA = window.PF_PREFLOP_DATA;
+  const E = window.PFEngine;
+  // the 30 flops used by the solver drill, high to low
+  const FLOPS = ['AhAd7c', 'AhKd5c', 'AsQs6d', 'AsJh9s', 'As7d2c', 'Ad5d4c', 'KsKd4h', 'KhQd4c', 'KsJs8s', 'Kd9d5s', 'Ks7d2c',
+    'QsTd8c', 'Qh9c4d', 'Qd6d2s', 'JhTd3c', 'Js8d6h', 'Jc7c2h', 'Th9h8c', 'Tc8c4c', 'Td5c2s', '9s9h4h', '9d8d6s', '9s6h4c',
+    '8h7c4h', '8d5s2h', '7d7c2s', '7c6d5s', '7h4h2h', '6s4d3c', '5h3c2d'];
+  const SUIT_SYM = { s: '♠', h: '♥', d: '♦', c: '♣' };
+  const advCache = {};
   const ORDER = DATA.order;
   const DIG = '0123456789abcdefghijk';
   const SEATS = ['UTG', 'UTG+1', 'LJ', 'HJ', 'CO', 'BTN', 'SB', 'BB'];
@@ -9,12 +16,13 @@
   const $ = (s) => document.querySelector(s);
   const el = (tag, cls, html) => { const n = document.createElement(tag); if (cls) n.className = cls; if (html != null) n.innerHTML = html; return n; };
 
-  const state = { depth: '50', opener: null, resp: null };
+  const state = { depth: '50', opener: null, resp: null, flop: '' };
   try {
     const saved = JSON.parse(localStorage.getItem('prv:state') || '{}');
     if (saved.depth && DATA.depths[saved.depth]) state.depth = saved.depth;
     if (saved.opener) state.opener = saved.opener;
     if (saved.resp) state.resp = saved.resp;
+    if (saved.flop && FLOPS.includes(saved.flop)) state.flop = saved.flop;
   } catch (e) { /* ignore */ }
   const save = () => { try { localStorage.setItem('prv:state', JSON.stringify(state)); } catch (e) { /* ignore */ } };
 
@@ -138,6 +146,83 @@
       }
     }
     $('#charts').classList.toggle('two', !!(op && state.resp));
+    renderFlop(op, rp);
+  }
+
+  // ---------------------------------------------------------------- flop advantages
+  // combos of a chart action, weighted by frequency, without the board cards
+  function rangeOf(chart, action, board) {
+    const out = [];
+    if (!chart || !chart[action]) return out;
+    const S = 'shdc';
+    ORDER.forEach((h, i) => {
+      const f = DIG.indexOf(chart[action][i]) / 20;
+      if (!(f > 0)) return;
+      const r1 = h[0], r2 = h[1];
+      for (let a = 0; a < 4; a++) {
+        for (let b = 0; b < 4; b++) {
+          if (h.length === 2) { if (b <= a) continue; }
+          else if (h[2] === 's') { if (a !== b) continue; }
+          else if (a === b) continue;
+          const c1 = E.parseCard(r1 + S[a]), c2 = E.parseCard(r2 + S[b]);
+          if (board.includes(c1) || board.includes(c2)) continue;
+          const combo = [c1, c2];
+          combo.w = f;
+          out.push(combo);
+        }
+      }
+    });
+    return out;
+  }
+
+  function renderFlop(op, rp) {
+    const panel = $('#flopPanel');
+    panel.hidden = !(op && rp && E);
+    if (panel.hidden) return;
+    const sel = $('#flop');
+    sel.value = state.flop;
+    const cards = $('#flopCards');
+    cards.innerHTML = '';
+    const adv = $('#flopAdv');
+    const note = $('#flopNote');
+    if (!state.flop) {
+      adv.hidden = true;
+      note.textContent = 'Pick a flop to see who has the range advantage and the nut advantage.';
+      return;
+    }
+    state.flop.match(/../g).forEach((c) => {
+      const n = el('div', 'card small suit-' + c[1], `<span class="rank">${c[0] === 'T' ? '10' : c[0]}</span><span class="pip">${SUIT_SYM[c[1]]}</span>`);
+      cards.appendChild(n);
+    });
+    const board = state.flop.match(/../g).map(E.parseCard);
+    const key = [state.depth, state.opener, state.resp, state.flop].join('|');
+    let a = advCache[key];
+    if (!a) {
+      const R = rangeOf(op, 'raise', board), C = rangeOf(rp, 'call', board);
+      if (!R.length || !C.length) {
+        adv.hidden = true;
+        note.textContent = !C.length ? `${state.resp} never just calls this open at ${state.depth}bb, so there's no flop to compare.` : `${state.opener} has no non-all-in open at ${state.depth}bb.`;
+        return;
+      }
+      const eq = E.rangeEquity(R, C, board, 6000);
+      const nuts = E.nutStats(R, C, board, 0.05);
+      const hi = Math.max(nuts.aFrac, nuts.bFrac), lo = Math.min(nuts.aFrac, nuts.bFrac);
+      const nutSide = hi - lo < 0.015 ? null : (lo === 0 ? hi > 0 : hi / lo >= 1.3) ? (nuts.aFrac > nuts.bFrac ? 'opener' : 'resp') : null;
+      a = advCache[key] = { eq, range: eq >= 0.53 ? 'opener' : eq <= 0.47 ? 'resp' : null, nutO: nuts.aFrac, nutR: nuts.bFrac, nut: nutSide, cut: nuts.cutLabel };
+    }
+    // who is in position after the flop: the blinds act first, otherwise the later seat
+    const blinds = ['SB', 'BB'];
+    const respIP = !blinds.includes(state.resp) || (state.resp === 'BB' && state.opener === 'SB');
+    const name = (side) => (side === 'opener' ? state.opener : state.resp);
+    const role = (side) => `${side === 'opener' ? 'raiser' : 'caller'}, ${(side === 'resp') === respIP ? 'in position' : 'out of position'}`;
+    const pc = (x) => Math.round(x * 100) + '%';
+    note.textContent = `${E.describeBoard(board)[0].toUpperCase() + E.describeBoard(board).slice(1)} flop. ${state.opener} (${role('opener')}) vs ${state.resp} (${role('resp')}).`;
+    adv.innerHTML = `
+      <div><span class="adv-k">Range advantage</span><b class="adv-v ${a.range ? 'side-' + a.range : ''}">${a.range ? name(a.range) : 'Roughly even'}</b>
+        <small>${state.opener}'s range has ${pc(a.eq)} equity against ${state.resp}'s (${pc(1 - a.eq)}).</small></div>
+      <div><span class="adv-k">Nut advantage</span><b class="adv-v ${a.nut ? 'side-' + a.nut : ''}">${a.nut ? name(a.nut) : 'Roughly even'}</b>
+        <small>Strongest 5% of hands (about ${a.cut.replace(/ \(.*\)$/, '').toLowerCase()} or better): ${state.opener} ${pc(a.nutO)} of its range, ${state.resp} ${pc(a.nutR)}.</small></div>`;
+    adv.hidden = false;
   }
 
   function init() {
@@ -155,6 +240,13 @@
       render();
     });
     $('#callsOnly').addEventListener('change', render);
+    const fsel = $('#flop');
+    FLOPS.forEach((f) => {
+      const o = el('option', null, f.match(/../g).map((c) => (c[0] === 'T' ? '10' : c[0]) + SUIT_SYM[c[1]]).join(' '));
+      o.value = f;
+      fsel.appendChild(o);
+    });
+    fsel.addEventListener('change', () => { state.flop = fsel.value; save(); render(); });
     render();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
