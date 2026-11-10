@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Resources</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=IBM+Plex+Mono:wght@500&family=Public+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap">
+  <nav class="nav" aria-label="Drills">
+    <a href="index.html">Flop checklist</a>
+    <a href="preflop.html">Preflop trainer</a>
+    <a href="pushfold.html">12bb push/fold</a>
+    <a href="ranges.html">Range viewer</a>
+    <a href="solver.html">Solver flop drill</a>
+    <a href="turn.html">Solver turn drill</a>
+    <a href="leaks.html">My leaks</a>
+    <a href="resources.html" aria-current="page">Resources</a>
+  </nav>
+  <header>
+    <div class="brand">
+      <h1>Resources</h1>
+      <p>Printable study guides built from your charts and the solved spots.</p>
+    </div>
+  </header>
+
+  <section class="panel resource">
+    <div class="res-head">
+      <div>
+        <div class="eyebrow">PDF · 10 pages · US Letter</div>
+        <h2>Range advantage guide · 50bb</h2>
+      </div>
+      <div class="btnrow">
+        <a class="btn" href="resources/range-advantage-guide-50bb.pdf" target="_blank" rel="noopener">Open PDF</a>
+        <a class="btn ghost" href="resources/range-advantage-guide-50bb.pdf" download>Download</a>
+      </div>
+    </div>
+    <p>One page per solved 50bb spot: the raiser's and caller's preflop ranges side by side, then all 30 solver flops with who has the range advantage (and each side's equity) and who has the nut advantage (and each side's share of the strongest hands).</p>
+    <ul class="res-list">
+      <li>UTG, HJ, CO and BTN vs BB</li>
+      <li>SB vs BB, CO vs BTN (BTN flats)</li>
+      <li>BB 3-bet vs BTN, SB 3-bet vs BTN, BTN 3-bet vs CO</li>
+    </ul>
+  </section>
+
+  <footer>
+    Guides are generated from the same data as the drills (tools/make_range_guide.js), so they can be rebuilt whenever new spots are solved.
+  </footer>
+</div>
+</body>
+</html>

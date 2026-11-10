@@ -384,3 +384,10 @@ a.btn { text-decoration: none; display: inline-block; }
 .rv-flop .adv { margin: 10px 0 0; }
 .adv-v.side-opener { color: var(--act-raise); }
 .adv-v.side-resp { color: var(--act-call); }
+
+/* resources page */
+.resource h2 { margin: 2px 0 0; font-size: 1.3rem; }
+.res-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 12px; margin-bottom: 8px; }
+.res-head .btnrow { margin: 0; }
+.resource p { margin: 6px 0; max-width: 65ch; }
+.res-list { margin: 6px 0 0; padding-left: 18px; color: var(--muted); }
