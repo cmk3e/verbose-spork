@@ -3,7 +3,7 @@
  * usage (from postflop-drills/):  node tools/make_briefing.js [name]
  *   default name: stack-size-briefing  ->  resources/stack-size-briefing.html / .pdf
  *
- * Handles the Markdown the briefings use: #/## headings, paragraphs, "- " bullets,
+ * Handles the Markdown the briefings use: #/##/### headings, paragraphs, "- " bullets,
  * pipe tables and **bold**.
  */
 const fs = require('fs');
@@ -27,6 +27,7 @@ function toHTML(md) {
     if (!l.trim()) { i++; continue; }
     if (l.startsWith('# ')) { title = l.slice(2); out.push(`<h1>${inline(title)}</h1>`); i++; continue; }
     if (l.startsWith('## ')) { out.push(`<h2>${inline(l.slice(3))}</h2>`); i++; continue; }
+    if (l.startsWith('### ')) { out.push(`<h3>${inline(l.slice(4))}</h3>`); i++; continue; }
     if (l.startsWith('- ')) {
       const items = [];
       while (i < lines.length && lines[i].startsWith('- ')) items.push(`<li>${inline(lines[i++].slice(2))}</li>`);
@@ -39,8 +40,8 @@ function toHTML(md) {
       const cells = (r) => r.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
       const head = cells(rows[0]);
       const body = rows.slice(2).map(cells);
-      // keep short tables on one page; let long ones (like the cheat sheet) break between rows
-      out.push(`<table${body.length <= 12 ? ' class="keep"' : ''}><thead><tr>${head.map((h) => `<th>${inline(h)}</th>`).join('')}</tr></thead><tbody>${
+      // keep tables that fit on a page in one piece; longer ones break between rows
+      out.push(`<table${body.length <= 26 ? ' class="keep"' : ''}><thead><tr>${head.map((h) => `<th>${inline(h)}</th>`).join('')}</tr></thead><tbody>${
         body.map((r) => `<tr>${r.map((c, j) => `<td${j === 0 ? ' class="first"' : ''}>${inline(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`);
       continue;
     }
@@ -60,6 +61,7 @@ body { margin: 0; font-family: "Public Sans", "Helvetica Neue", Arial, sans-seri
 h1 { font-size: 21pt; line-height: 1.15; margin: 0 0 6px; }
 h1 + p { color: #5a6a61; font-size: 9.6pt; margin: 0 0 14px; padding-bottom: 10px; border-bottom: 1.5px solid #15211b; }
 h2 { font-size: 13pt; margin: 18px 0 6px; padding-top: 4px; break-after: avoid; page-break-after: avoid; }
+h3 { font-size: 10.8pt; margin: 12px 0 5px; break-after: avoid; page-break-after: avoid; }
 p { margin: 0 0 7px; }
 ul { margin: 0 0 8px; padding-left: 18px; }
 li { margin: 0 0 3px; }
@@ -69,6 +71,7 @@ b { font-weight: 700; }
 table { width: 100%; border-collapse: collapse; margin: 4px 0 10px; font-size: 8.4pt; line-height: 1.32; break-inside: auto; }
 tr { break-inside: avoid; page-break-inside: avoid; }
 table.keep { break-inside: avoid; page-break-inside: avoid; }
+p:has(+ table), h2:has(+ table), h3:has(+ table) { break-after: avoid; page-break-after: avoid; }
 th { text-align: left; font-size: 7.6pt; text-transform: uppercase; letter-spacing: .04em; color: #5a6a61; border-bottom: 1.5px solid #15211b; padding: 4px 5px; vertical-align: bottom; }
 td { padding: 4px 5px; border-bottom: .5px solid #d3dbd6; vertical-align: top; }
 td.first { font-weight: 600; }

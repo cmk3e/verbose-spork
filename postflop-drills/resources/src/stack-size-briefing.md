@@ -1,6 +1,6 @@
 # Briefing: Stack-Size Adjustments Through the Tournament Phases
 
-Summary of a PokerCoaching webinar by Matt Affleck on adjusting ranges to stack depth, with a comparison to the charts and solves in the Postflop Framework Drills. November 2026.
+Summary of two PokerCoaching videos (Matt Affleck's webinar on adjusting ranges to stack depth, and Jonathan Little's video on bubble strategy), with a comparison to the charts and solves in the Postflop Framework Drills. November 2026.
 
 ## Summary
 
@@ -14,7 +14,7 @@ The five ideas that carry the rest:
 - **SPR drives everything.** Below an SPR of about 5, good top pairs can stack off and normal bet sizes get the money in by the river. Above 5, they can't, and you need a stronger hand.
 - **Use effective stacks, not your own stack.** With 100bb against a table of 50bb stacks you are playing a 50bb game; with 40bb against 20bb stacks you are playing 20bb.
 
-Scope: the webinar is about stack depth, not tournament stages as such. It barely covers the bubble or ICM (one line on raising more when there are big pay jumps) and gives no push/fold ranges; the push/fold remarks are collected in the short-stack section below.
+Scope: the main webinar is about stack depth, not tournament stages, and barely covers the bubble. A second PokerCoaching video, Jonathan Little on bubble strategy, fills that gap: ICM, risk premium, how each stack size should play, and 22 hand examples. It has its own section below. Neither video gives push/fold ranges.
 
 ## Stack-depth bands
 
@@ -82,6 +82,88 @@ Always size your strategy to the effective stack, the smaller of the stacks invo
 
 **Cash games** follow the same principles at the same depths. The webinar's ranges assume antes, so adjust for cash games without antes. The single big-blind ante changes strategy less than people think; it mainly speeds the game up.
 
+## Bubble strategy, ICM and risk premium
+
+On the bubble, chips you lose are worth more than chips you win, so you need extra equity, the "risk premium", to call or make an all-in. This section comes from a second PokerCoaching video, Jonathan Little's "Mastering the fundamentals of bubble strategy". The bubble here means you're one or a few eliminations from the money, close enough that you could reasonably fold your way in.
+
+**Avoid going broke, but don't lock down.** Collecting free equity as others bust is real money. But don't blind out by folding everything: many middle and short stacks tighten too early (say with 150 left and 100 paid), drift from 35bb to 20bb, min-cash, and wreck their chance of a deep run. A min-cash is about 1.5 buy-ins, not a big success.
+
+**Know the payout structure.** Care about a pay jump only when it's meaningful: in the money with $150 locked, a jump to $156 doesn't matter, but a jump to $250 does. Top-heavy payouts (first used to get about 33% of the prize pool; now nearer 15%) reward gambling to win. Flatter modern payouts reward hanging on and moving up. Small local events are often steep.
+
+**Why it costs to gamble (ICM example).** Four players each hold 25% of the chips; payouts are $1,000 / $700 / $400 / $200, so each stack is worth $575 on average.
+
+| Outcome of a 50/50 all-in between two of them | Your ICM equity |
+| --- | --- |
+| Before the hand | $575 |
+| You win (double up) | $800 |
+| You lose (out in 4th) | $200 |
+| Average of win and lose | $500 |
+
+Both players put in $575 of equity ($1,150 total) and get back $1,000 on average. The missing $150 goes to the two players who folded.
+
+**Every stack in the tournament matters,** which is why there are no generic bubble charts. With 5bb when the average is 25bb, you can fold into the money if 300 are left and 299 get paid, or if several players have 1bb. If nine are left, everyone else has 20bb+ and you have 5bb, nobody else is likely to bust first: you'll have to double up or bubble.
+
+### Risk premium
+
+When facing (or making) a bet for all or most of your chips, required equity = the pot-odds equity + a risk premium. If you lose you're out or crippled; if you win you don't double your equity. The premium depends on your stack and your opponent's, and applies when you bluff as well as when you call. The video's rough guide, for facing an all-in or near all-in at a final table or on the bubble:
+
+| You vs the bettor | Extra equity needed |
+| --- | --- |
+| Short stack vs big stack (you're out if you lose) | About 9–15% |
+| Short vs medium, short vs short | A little less than short vs big |
+| Big stack vs big stack (both comfortably cashing) | About 18–35% |
+| Big stack vs short stack | Very little: losing barely dents you |
+
+It can be much higher: with a 1bb stack in the tournament on the bubble, a short stack might need around 70% equity to call. Example: two 50bb stacks when the average is 20bb; QQ facing an all-in from AK is about 50%, but it needs about 70% after the risk premium, which is almost impossible preflop. So fold.
+
+**Worked example.** Folded to a 40bb big stack in the small blind; you have 10bb in the big blind, with no tiny stacks around. The big stack should shove any two cards, because your risk premium is so large. You call 9bb to win 21bb, so 9 ÷ 21 = 42.8% without ICM. Add about 12% for the bubble and a margin for profit: you need about 56%. Against a 100% shoving range that means about 44+, A6s+, A8o+, K6s+, K8o+, Q8s+ and JTs. Call tighter still (about 99+, KJs+, ATo+) with shorter stacks elsewhere or when you're likely to cash anyway. If you're the obvious short stack and the next to bust, you can call a bit wider.
+
+**Opponents differ.** Some players ignore ICM and play to win; others play very tight to cash. If an opponent defends loosely, tighten up (you don't want action); if they defend too tightly, loosen up. The presenter once ran over a final-table player who needed 4th place to pay off a house, then called him lighter (A10) the moment that player jammed once 4th was locked.
+
+### By stack role on the bubble
+
+| Your stack | How to play |
+| --- | --- |
+| Biggest stack | Pressure everyone. Min-raise a lot (with medium to deep stacks), 3-bet medium stacks who open without accounting for ICM, call more in position, defend the big blind wide, and lead flops that suit your range. Still fold when clearly behind (for example A-K-Q against a 3-bettor) or when nobody is folding. |
+| Medium stack | Pressure other medium stacks and the short stacks who are likely to cash. Avoid the big stacks, and tighten up a lot with a big stack on your direct left. If the big stack won't fight, play like the big stack. |
+| Short stack | Pressure other short stacks; otherwise try to sneak into the money. |
+
+**Aces as bubble bluffs.** Ax offsuit and suited hands become good 3-bet and shove bluffs because the ace blocks the hands that can call or jam over you (AA, AK, AQ). When you bluff with payout implications, try to hold an ace.
+
+### Hand examples from the video (bubble)
+
+| Hand | Stacks and action | Play | Why |
+| --- | --- | --- | --- |
+| A6o | You 100bb in position; 75bb cutoff raises | 3-bet | Big stack applying pressure, especially with a 2–5bb stack in the tournament |
+| T7s | You open the button; big blind 3-bets | Call | In position against a player with a big risk premium; bluff boards that suit you. Fold if the flop is A-K-Q and they bet |
+| 97s | Big stack, early position | Usually raise; fold if everyone is calling | Pressure only works if people fold |
+| JJ | 75bb; low-jack raises; short stacks in the tournament | Call, don't 3-bet | Avoid playing for 75bb on the bubble |
+| K8s | 75bb with 75bb and 100bb stacks to your left | Fold (maybe even KTs) | Big stacks behind will play back at you |
+| A9o | 75bb in the small blind facing a raise | Fold | Out of position on the bubble |
+| 96s | 50bb; short stacks to your left and a 50bb big blind | Raise, if they're cautious and straightforward | Exploit players who won't fight |
+| A5o | 50bb in the small blind; raise and three calls | Squeeze small (to 1,500) | The ace blocks continuing hands; easy fold to a shove, big pot when they fold |
+| AQs | 40bb facing a raise | Call (a jam is profitable but risky) | "Chill out, don't go broke", especially with short stacks around |
+| A5o | 35bb facing a 40bb raise | Fold | Especially with shorter stacks in the tournament |
+| AQs | 35bb; raise, call, call | Jam or call | Call if there are 2bb stacks at other tables |
+| A8o | 30bb; 18bb hijack raises; others 20bb, one 10bb | Fold (3-bet bluff only against loose openers who fold) | Miserable when called |
+| Q9s | 30bb; hijack raises, cutoff calls | Squeeze all in | Risking about 2,000 chips; still about 10bb if it fails |
+| ATs | 30bb; raise and three calls | Jam (unless an obvious short stack) | Extra dead money in the pot |
+| 72s | 25bb, first in | Min-raise; fold to a jam | Don't shove trash |
+| AJo | Facing an 8bb jam from UTG+1 | Often fold | Not automatic against a tight jammer; losing costs your big-stack edge |
+| A2o | 13bb in the small blind; button raises | Jam if the button opens too wide | Exploit wide openers who fold |
+| Any jam | 15bb on the button, the only shallow stack | Shove rather than min-raise | Don't leave yourself a marginal call-off |
+| K2o | 20bb; everyone else 10bb | Min-raise (also with your best hands); fold garbage to a shove | Don't jam hands that are dominated when called |
+| 97s | 20bb | Shove | A min-raise commits you to a marginal call against a jam |
+| K7o | 11bb; small blind jams | Fold | Usually a call without ICM, but the payout implications cost too much |
+| Q7o | 6bb on the button | Fold | Usually an open-shove, but the big blind calls too often; wait for someone to bust |
+
+### Postflop on the bubble
+
+- **Big stack:** c-bet and lead far more often on boards that suit your range, usually with small bets: each bet nudges a medium stack closer to all in, and by the river their whole stack is at risk.
+- **Triple barrel more** when the board runs out badly for them, for example a river that completes a straight they can't hold. Bluff catchers can't call profitably once the risk premium is included.
+- **Short stack:** check-raise less, especially as a bluff; make bigger river folds even against bluffers; get out of pots early rather than reaching big river decisions.
+- **Go broke only with a clear edge** (for example KK against a loose player who has lots of Ax), or when you're clearly the next to bust.
+
 ## Stack-to-pot ratio (SPR)
 
 SPR is the effective stack behind divided by the pot on the flop, and it decides how strong a hand must be to stack off. The rule of thumb: below about 5, good top pairs are strong enough to get all in; above 5, be cautious with one pair.
@@ -110,7 +192,7 @@ Why the same hand is stronger shallow: at low SPR, opponents get their best hand
 
 ## Cheat sheet
 
-| Situation | Rule of thumb from the webinar |
+| Situation | Rule of thumb |
 | --- | --- |
 | Which stack to use | Effective stack (the smaller one), never your own |
 | 150–200bb | Suited and connected hands, small pairs, wheel aces; very few offsuit hands; one pair rarely stacks off |
@@ -128,6 +210,12 @@ Why the same hand is stronger shallow: at low SPR, opponents get their best hand
 | Push/fold | Some open-jams from about 15bb; no jamming above 15bb |
 | Calling a 20bb jam | Nearly the same range with 40bb or 100bb |
 | Short stacks behind | Open tighter; prefer hands that block their re-jam range (KJo, offsuit aces) |
+| Bubble: required equity | Pot odds + risk premium: short vs big +9–15%; big vs big +18–35%; big vs short very little |
+| Bubble: 10bb big blind vs a 40bb small-blind jam | Need about 56% (44+, A6s+, A8o+, K6s+, K8o+, Q8s+, JTs); tighter with shorter stacks elsewhere |
+| Bubble: big stack | Min-raise a lot, 3-bet and defend wide, small c-bets and leads; still fold when clearly behind |
+| Bubble: medium stack | Pressure medium and short stacks; avoid big stacks, especially one on your left |
+| Bubble: bluffs | Hold an ace: it blocks the hands that call or jam |
+| Bubble: short stack | Shove rather than min-raise when you're the only short stack; fold marginal call-offs (K7o vs an 11bb jam) |
 
 ## How it compares with your charts and drills
 
@@ -153,4 +241,4 @@ Your PokerCoaching charts make the same core shift as the webinar, but more grad
 - **12bb push/fold:** for the short-stack end the webinar skips.
 - **Solver flop drill:** compare BTN vs BB at 50, 30 and 20bb, and the 3-bet pots, to see SPR change c-bet sizing and stack-off thresholds.
 
-Not covered by the webinar, so not drilled from it: bubble and ICM pressure, final-table pay jumps, and exact push/fold ranges.
+**On the bubble, your charts and drills need adjusting.** Your PokerCoaching charts, the 12bb push/fold page and the solver spots all assume chip EV, meaning no payout jumps. So on the bubble, call jams tighter than the charts by the risk premium. K7o facing an 11bb small-blind jam, normally a call, becomes a fold. Big stacks can open and jam wider than the charts against opponents who must play tight. The drills don't model ICM, so use the bubble section above as the adjustment layer on top of them.
