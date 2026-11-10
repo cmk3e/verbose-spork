@@ -19,6 +19,7 @@
     <a href="ranges.html">Range viewer</a>
     <a href="solver.html">Solver flop drill</a>
     <a href="turn.html">Solver turn drill</a>
+    <a href="leaks.html">My leaks</a>
   </nav>
   <header>
     <div class="brand">
@@ -70,6 +71,10 @@
       <legend>Spots to drill</legend>
       <div class="toggles" id="typeToggles"></div>
     </fieldset>
+    <fieldset>
+      <legend>Practice</legend>
+      <div class="toggles"><label class="tog"><input type="checkbox" id="focus"><span>Focus on my weak spots (deal more of the spot types and seats I get wrong)</span></label></div>
+    </fieldset>
     <div class="btnrow"><button class="btn ghost" id="deal" type="button">Deal a new hand now</button></div>
   </details>
 
@@ -86,6 +91,7 @@
   </footer>
 </div>
 <script>window.PF_TRAINER_MODE = 'pushfold';</script>
+<script src="history.js"></script>
 <script src="preflop-data.js"></script>
 <script src="preflop.js"></script>
 </body>

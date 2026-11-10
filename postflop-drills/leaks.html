@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>My Leaks</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=IBM+Plex+Mono:wght@500&family=Public+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap">
+  <nav class="nav" aria-label="Drills">
+    <a href="index.html">Flop checklist</a>
+    <a href="preflop.html">Preflop trainer</a>
+    <a href="pushfold.html">12bb push/fold</a>
+    <a href="ranges.html">Range viewer</a>
+    <a href="solver.html">Solver flop drill</a>
+    <a href="turn.html">Solver turn drill</a>
+    <a href="leaks.html" aria-current="page">My leaks</a>
+  </nav>
+  <header>
+    <div class="brand">
+      <h1>My Leaks</h1>
+      <p>Where you lose the most, from <span id="count">0</span> logged answers across the drills. Stored only in this browser.</p>
+    </div>
+  </header>
+
+  <section class="tiles" id="summary" aria-label="Accuracy by drill"></section>
+
+  <section class="panel">
+    <div class="eyebrow">Biggest solver leaks (flop and turn)</div>
+    <p class="note">Ranked by total EV lost. Open one to see which hand types cost you the most, then drill just that spot.</p>
+    <div id="solverLeaks"></div>
+  </section>
+
+  <section class="panel">
+    <div class="eyebrow">Preflop and push/fold</div>
+    <p class="note">Spot types and seats you get wrong most often.</p>
+    <div id="pfLeaks"></div>
+  </section>
+
+  <section class="panel">
+    <div class="eyebrow">Flop checklist questions</div>
+    <div id="checklist"></div>
+  </section>
+
+  <section class="panel">
+    <div class="eyebrow">Recent mistakes</div>
+    <p class="note">Your most recent misses. Replay opens the same hand in its drill.</p>
+    <div id="mistakes"></div>
+    <div class="btnrow"><button class="btn ghost" id="more" type="button" hidden>Show all 50</button></div>
+  </section>
+
+  <div class="btnrow"><button class="btn ghost" id="clear" type="button">Clear answer history</button></div>
+
+  <footer>
+    Each drill also has a "Focus on my weak spots" setting that deals more of the spots and hand types listed here.
+    History is kept for your last 3,000 answers.
+  </footer>
+</div>
+<script src="history.js"></script>
+<script src="engine.js"></script>
+<script src="leaks.js"></script>
+</body>
+</html>

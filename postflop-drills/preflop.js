@@ -3,6 +3,7 @@
 (function () {
   'use strict';
   const DATA = window.PF_PREFLOP_DATA;
+  const H = window.PFHistory;
   const ORDER = DATA.order;
   const DIG = '0123456789abcdefghijk';
   const SUIT_SYM = ['♠', '♥', '♦', '♣'];
@@ -140,7 +141,7 @@
 
   // ------------------------------------------------------------ state
   const state = {
-    settings: Object.assign({ depth: PUSHFOLD ? PF_DEPTH : 'any', types: Object.keys(TYPES), positions: POSITIONS.slice() }, store.get('settings', {})),
+    settings: Object.assign({ depth: PUSHFOLD ? PF_DEPTH : 'any', types: Object.keys(TYPES), positions: POSITIONS.slice(), focus: false }, store.get('settings', {})),
     stats: store.get('stats', {}),
     session: { right: 0, total: 0, streak: 0, hands: 0 },
     spot: null, handIdx: 0, cards: null, answered: false,
@@ -162,10 +163,33 @@
     return [[r1, s1], [r2, s2]];
   }
 
+  const DRILL = PUSHFOLD ? 'pushfold' : 'preflop';
+  const params = new URLSearchParams(location.search);
+  const focusKey = (s) => s.cat + '|' + s.hero;
   function deal() {
     let spots = eligibleSpots();
     if (!spots.length) spots = ALL_SPOTS;
-    if (PUSHFOLD) {
+    // ?pf=<depth>|<chart title>|<hand> replays one hand (first deal only)
+    const replay = !state.replayDone && (params.get('pf') || '').split('|');
+    state.replayDone = true;
+    if (replay && replay.length === 3) {
+      const rs = ALL_SPOTS.find((x) => x.depth === replay[0] && x.title === replay[1]);
+      const hi = ORDER.indexOf(replay[2]);
+      if (rs && hi >= 0 && rs.freqs[hi]) return show(rs, hi);
+    }
+    // ?only=<category>|<position> (from the leaks page) drills just that spot type and seat
+    const only = (params.get('only') || '').split('|');
+    if (only[0]) {
+      const os = ALL_SPOTS.filter((x) => x.cat === only[0] && (!only[1] || x.hero === only[1]));
+      if (os.length) spots = os;
+    }
+    if (H && state.settings.focus && !only[0]) {
+      // weight spot type + seat by how often you have been getting it wrong
+      const st = H.statsBy(DRILL, 'k');
+      const keys = Array.from(new Set(spots.map(focusKey)));
+      const k = H.pickWeighted(keys, (key) => H.weight(st[key], false));
+      spots = spots.filter((x) => focusKey(x) === k);
+    } else if (PUSHFOLD) {
       // pick the kind of spot first so open shoves aren't swamped by the many facing-action charts
       const cat = pick(Array.from(new Set(spots.map((x) => x.cat))));
       spots = spots.filter((x) => x.cat === cat);
@@ -182,7 +206,10 @@
       items.push([i, total]);
     });
     const x = Math.random() * total;
-    const handIdx = items.find((it) => it[1] >= x)[0];
+    show(spot, items.find((it) => it[1] >= x)[0]);
+  }
+
+  function show(spot, handIdx) {
     state.spot = spot;
     state.handIdx = handIdx;
     state.cards = dealCards(ORDER[handIdx]);
@@ -243,6 +270,15 @@
     st.total++; if (v.ok) st.right++;
     state.stats[s.cat] = st;
     store.set('stats', state.stats);
+    if (H) {
+      const sym = (c) => (c[0] === 'T' ? '10' : c[0]) + SUIT_SYM[c[1]];
+      H.log({
+        d: DRILL, k: focusKey(s), lab: `${TYPES[s.cat]} · ${s.hero}`, g: s.hero,
+        ok: v.ok, v: v.text, depth: s.depth,
+        hand: `${state.cards.map(sym).join('')} (${ORDER[state.handIdx]}) · ${s.title.replace(' · ', ', ')} · ${s.depth}bb`,
+        link: `${PUSHFOLD ? 'pushfold' : 'preflop'}.html?pf=${encodeURIComponent(s.depth + '|' + s.title + '|' + ORDER[state.handIdx])}`,
+      });
+    }
 
     document.querySelectorAll('#options .opt').forEach((b) => {
       b.disabled = true;
@@ -312,6 +348,11 @@
   function renderSettings() {
     const depths = Object.keys(DATA.depths).sort((a, b) => b - a);
     const dbox = $('#depthToggles');
+    const fo = $('#focus');
+    if (fo) {
+      fo.checked = !!state.settings.focus;
+      fo.onchange = () => { state.settings.focus = fo.checked; store.set('settings', state.settings); };
+    }
     const pbox = $('#posToggles');
     if (pbox) {
       pbox.innerHTML = '';

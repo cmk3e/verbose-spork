@@ -19,6 +19,7 @@
     <a href="ranges.html">Range viewer</a>
     <a href="solver.html">Solver flop drill</a>
     <a href="turn.html" aria-current="page">Solver turn drill</a>
+    <a href="leaks.html">My leaks</a>
   </nav>
   <header>
     <div class="brand">
@@ -78,6 +79,7 @@
     </fieldset>
     <fieldset>
       <legend>Hands</legend>
+      <div class="toggles"><label class="tog"><input type="checkbox" id="focus"><span>Focus on my weak spots (deal more of the decisions and hand types where I lose the most EV)</span></label></div>
       <div class="toggles"><label class="tog"><input type="checkbox" id="showAdv"><span>Show range and nut advantage before I answer</span></label></div>
       <div class="toggles"><label class="tog"><input type="checkbox" id="mainOnly"><span>Main-range hands only (my preflop chart plays them at least 50%)</span></label></div>
     </fieldset>
@@ -102,6 +104,7 @@
   </footer>
 </div>
 <script src="ranges-data.js"></script>
+<script src="history.js"></script>
 <script src="engine.js"></script>
 <script>window.SOLVER_STREET = 'turn';</script>
 <script src="solver.js"></script>

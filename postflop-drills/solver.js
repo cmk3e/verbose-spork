@@ -4,6 +4,7 @@
 (function () {
   'use strict';
   const E = window.PFEngine;
+  const H = window.PFHistory;
   const STREET = window.SOLVER_STREET === 'turn' ? 'turn' : 'flop';
   // Solved spots; each has solver-data/<id>/index.json. Add new spots here.
   const ALL_SPOTS = [
@@ -108,6 +109,7 @@
   }
   function migrateSettings(s) {
     const out = Object.assign({ types: Object.keys(TYPES), spots: SPOTS.map((x) => x.id) }, s);
+    if (out.focus == null) out.focus = false;
     if (STREET === 'turn') {
       if (out.mainOnly == null) out.mainOnly = false;
       if (out.showAdv == null) out.showAdv = true;
@@ -194,17 +196,44 @@
     const forced = !state.forcedDone && (new URLSearchParams(location.search).get('hand') || '').split('/');
     state.forcedDone = true;
     const fSpot = forced && forced.length === 4 && loadedSpots().find((x) => x.id === forced[0]);
-    const spot = fSpot || avSpots[rand(avSpots.length)];
+    // ?only=<spot>:<decision> (from the leaks page) drills just that spot and decision
+    const only = (new URLSearchParams(location.search).get('only') || '').split(':');
+    const onlySpot = only[0] && loadedSpots().find((x) => x.id === only[0]);
+    if (onlySpot) avSpots = [onlySpot];
+    let wantType = onlySpot && only[1] ? only[1] : null;
+    let spot = fSpot || null;
+    if (!spot && H && (state.settings.focus || wantType)) {
+      // weight each (spot, decision) by how much EV you have been losing there
+      const st = H.statsBy(STREET, 'k');
+      const cands = [];
+      for (const sp of avSpots) {
+        for (const t of new Set(Object.values(drillNodes(sp, state.indexes[sp.id])))) {
+          if (wantType ? t === wantType : types.includes(t)) cands.push({ sp, t });
+        }
+      }
+      if (cands.length) {
+        const c = H.pickWeighted(cands, (x) => (wantType ? 1 : H.weight(st[x.sp.id + ':' + x.t], true)));
+        spot = c.sp;
+        wantType = c.t;
+      }
+    }
+    spot = spot || avSpots[rand(avSpots.length)];
     const index = state.indexes[spot.id];
-    const flopName = fSpot && index.flops.includes(forced[1]) ? forced[1] : index.flops[rand(index.flops.length)];
-    const flop = await loadFlop(spot.id, flopName);
+    const typeNodes = wantType ? Object.entries(drillNodes(spot, index)).filter(([, t]) => t === wantType).map(([n]) => n) : null;
+    let flopName = fSpot && index.flops.includes(forced[1]) ? forced[1] : index.flops[rand(index.flops.length)];
+    let flop = await loadFlop(spot.id, flopName);
+    // when a decision is wanted, find a board where it actually comes up
+    for (let tries = 0; typeNodes && !fSpot && tries < 8 && !typeNodes.some((n) => flop.nodes[n] && betUsed(flop, n)); tries++) {
+      flopName = index.flops[rand(index.flops.length)];
+      flop = await loadFlop(spot.id, flopName);
+    }
     if (fSpot && flop.nodes[forced[2]] && flop.nodes[forced[2]].hands[forced[3]]) {
       Object.assign(state, { spot, index, flop, nodeName: forced[2], node: flop.nodes[forced[2]], combo: forced[3], answered: false });
       state.session.hands++;
       render();
       return;
     }
-    let avail = namesFor(spot).filter((n) => flop.nodes[n] && betUsed(flop, n));
+    let avail = (typeNodes || namesFor(spot)).filter((n) => flop.nodes[n] && betUsed(flop, n));
     if (!avail.length) avail = Object.keys(drillNodes(spot, index)).filter((n) => flop.nodes[n]);
     const nodeName = avail[rand(avail.length)];
     const node = flop.nodes[nodeName];
@@ -217,10 +246,20 @@
       const main = entries.filter(([c]) => { const f = preflopFreq(spot, heroIsRaiser, handClass(c), index, heroIP); return f == null || f >= 0.5; });
       if (main.length) entries = main;
     }
+    // focus mode: also lean towards the hand types (strong, draws, marginal, weak draws, air)
+    // you lose the most with in this decision
+    let gw = null;
+    if (H && state.settings.focus && E && E.handFeatures) {
+      const key = index.id + ':' + drillNodes(spot, index)[nodeName];
+      const st = H.statsBy(STREET, (e) => (e.k === key ? e.g : null));
+      const board = flop.flop.match(/../g).map(E.parseCard);
+      gw = (c) => H.weight(st[E.handFeatures([E.parseCard(c.slice(0, 2)), E.parseCard(c.slice(2))], board).group], true);
+    }
+    const wOf = gw ? ([c, v]) => v[0] * gw(c) : ([, v]) => v[0];
     let total = 0;
-    for (const [, v] of entries) total += v[0];
+    for (const e of entries) total += wOf(e);
     let x = Math.random() * total, combo = entries[0][0];
-    for (const [c, v] of entries) { x -= v[0]; if (x <= 0) { combo = c; break; } }
+    for (const e of entries) { x -= wOf(e); if (x <= 0) { combo = e[0]; break; } }
     Object.assign(state, { spot, index, flop, nodeName, node, combo, answered: false });
     state.session.hands++;
     render();
@@ -300,7 +339,21 @@
     const ss = state.session;
     ss.total++; ss.evLoss += loss;
     if (ok) { ss.right++; ss.streak++; } else ss.streak = 0;
-    const type = state.index.id + ':' + drillNodes(state.spot, state.index)[nodeName];
+    const tkey = drillNodes(state.spot, state.index)[nodeName];
+    const type = state.index.id + ':' + tkey;
+    if (H) {
+      let group = null;
+      try {
+        const board = state.flop.flop.match(/../g).map(E.parseCard);
+        group = E.handFeatures([E.parseCard(combo.slice(0, 2)), E.parseCard(combo.slice(2))], board).group;
+      } catch (e) { /* engine missing */ }
+      H.log({
+        d: STREET, k: type, lab: `${state.spot.label} · ${typeLabel(tkey, state.spot)}`, g: group,
+        ok, loss: +loss.toFixed(2), pct: +lossPct.toFixed(2), v: verdict,
+        hand: `${prettyCombo(combo)} on ${state.flop.flop.match(/../g).map(prettyCard).join(' ')}`,
+        link: `${STREET === 'turn' ? 'turn' : 'solver'}.html?hand=${state.index.id}/${state.flop.flop}/${nodeName}/${combo}`,
+      });
+    }
     const st = state.stats[type] || { right: 0, total: 0, loss: 0 };
     st.total++; st.loss += loss; if (ok) st.right++;
     state.stats[type] = st;
@@ -580,6 +633,11 @@
     const sa = $('#showAdv');
     sa.checked = !!state.settings.showAdv;
     sa.onchange = () => { state.settings.showAdv = sa.checked; store.set('settings', state.settings); if (!state.answered) $('#adv').hidden = !sa.checked; };
+    const fo = $('#focus');
+    if (fo) {
+      fo.checked = !!state.settings.focus;
+      fo.onchange = () => { state.settings.focus = fo.checked; store.set('settings', state.settings); };
+    }
     const mo = $('#mainOnly');
     mo.checked = !!state.settings.mainOnly;
     mo.onchange = () => { state.settings.mainOnly = mo.checked; store.set('settings', state.settings); };

@@ -354,3 +354,25 @@ footer { color: var(--muted); font-size: .78rem; max-width: 65ch; }
 }
 .rv-chart { align-content: start; }
 @media (max-width: 520px) { .pokertable { padding: 30px 36px; } }
+/* leaks page */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 0 0 16px; }
+.tile { display: grid; gap: 2px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.tile span { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+.tile b { font-size: 1.5rem; }
+.tile small { color: var(--muted); font-size: .8rem; }
+.leak { border: 1px solid var(--line); border-radius: 10px; padding: 0 12px; margin: 8px 0; }
+.leak > summary { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 10px 0; cursor: pointer; list-style: none; }
+.leak > summary::-webkit-details-marker { display: none; }
+.leak-name { display: grid; gap: 2px; }
+.leak-name small, .leak-num small, .muted { color: var(--muted); font-size: .8rem; }
+.leak-num { display: grid; text-align: right; white-space: nowrap; }
+.leak-num b { color: var(--bad); }
+.leak .subt { margin-bottom: 10px; }
+.subt th { text-align: left; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; padding: 4px 0; }
+.subt th.num, .subt td.num { text-align: right; padding-left: 10px; }
+.leak .btnrow { padding-bottom: 12px; }
+a.btn { text-decoration: none; display: inline-block; }
+.misses { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.misses li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
+.misses li span { display: grid; gap: 2px; min-width: 0; }
+.misses li small { color: var(--muted); font-size: .8rem; }
