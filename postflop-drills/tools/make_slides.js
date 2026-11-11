@@ -112,17 +112,7 @@ S.push(`<section class="slide title">
   <p class="t-sub">How preflop ranges, 3-bets and postflop commitment change from deep stacks to push/fold</p>
 </section>`);
 
-S.push(`<section class="slide">
-  ${head('The static fallacy vs the dynamic strategy', null)}
-  <div class="two">
-    <div class="pane"><h2>The static fallacy</h2>
-      <div class="lockwrap">${grid(LJ[50], '#59636b', { labels: false, size: 'mid' })}<div class="lock">🔒</div></div>
-      <p>Weaker players use one opening range at every stack depth, ignoring what happens after the flop.</p></div>
-    <div class="pane"><h2>The dynamic strategy</h2>
-      <div class="tri">${[['80', C.deep], ['50', '#8f7ba4'], ['20', C.shallow]].map(([d, col]) => `<div><div class="mini-t">LJ open · ${d}bb</div>${grid(LJ[d], col, { labels: false, size: 'small' })}<div class="mini-p">${pct(LJ[d]).toFixed(1)}% of hands</div></div>`).join('')}</div>
-      <p>Good players keep roughly the same <b>number</b> of hands but change <b>which</b> hands as the effective stack shrinks. These are your real lojack charts.</p></div>
-  </div>
-</section>`);
+
 
 S.push(`<section class="slide">
   ${head('The inverse value seesaw', null)}
@@ -188,21 +178,40 @@ S.push(`<section class="slide">
   </div>
 </section>`);
 
-S.push(`<section class="slide">
-  ${head('3-betting: the shallow-stack strategy', 0.8)}
-  <div class="three-cols">
-    <div class="pane center"><h2>The blocker shield</h2>
-      <div class="shield">${['AA', 'KK', 'AK', 'AQ'].map((h) => `<div class="arrow">${h}</div>`).join('')}<div class="sh">A</div></div>
-      <p class="small">At 50bb, opponents 4-bet <b>jam</b> over your 3-bet. An ace in your hand cuts their AA, AK and AQ combos; a king cuts KK and AK.</p></div>
-    <div class="pane center"><h2>The swap</h2>
-      <div class="swap"><div class="old">76s · 65s</div><div class="arr">→</div><div class="new">ATo · AJo · KJo<br>KTo · A9s–A6s</div></div>
-      <p class="small">Small suited connectors can't call a jam and don't block anything. Offsuit Broadways block the jams and flop top pairs that are easy to play when called.</p></div>
-    <div class="pane"><h2>Your 50bb chart</h2>
-      <table class="tbl"><thead><tr><th>Hand</th><th>3-bet at 80bb</th><th>at 50bb</th></tr></thead><tbody>
-        ${['ATo', 'AQo', 'A5s', 'KJo', 'QJo', 'A2s', '65s'].map((h) => `<tr><td>${h}</td><td>${Math.round(bt80[h] * 100)}%</td><td>${Math.round(bt50[h] * 100)}%</td></tr>`).join('')}</tbody></table>
-      <p class="small">BTN vs LJ open. Offsuit Broadways rise; A2s and 65s drop out. A5s stays: it blocks aces and still makes wheels.</p></div>
+// BTN vs LJ open at 100bb vs 40bb (PokerCoaching charts from the user's screenshots, used only here)
+(() => {
+  const X = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'btn_vs_lj_100_40.json'), 'utf8'));
+  const deepOnly = ['QJs', 'JTs', '65s', '76s'], shallowOnly = ['K9s', 'K7s', 'K6s'];
+  const g = (fr) => {
+    let cells = '';
+    for (let r = 0; r < 13; r++) for (let c = 0; c < 13; c++) {
+      const h = handAt(r, c); const f = fr[h] || {}; let x = 0; const st = [];
+      for (const [a, col] of [['raise', C.red], ['call', C.green]]) { const v = f[a] || 0; if (v > 0) { st.push(`${col} ${x * 100}% ${(x + v) * 100}%`); x += v; } }
+      st.push(`#46525c ${x * 100}% 100%`);
+      const cls = deepOnly.includes(h) ? ' hl-deep' : shallowOnly.includes(h) ? ' hl-shal' : '';
+      cells += `<div class="gc on${cls}" style="background:linear-gradient(90deg,${st.join(',')})">${h}</div>`;
+    }
+    return `<div class="g mid8">${cells}</div>`;
+  };
+  const p3 = (d, h) => Math.round(((X[d][h] || {}).raise || 0) * 100);
+  const rows = [...shallowOnly, ...deepOnly].map((h) => `<tr class="${shallowOnly.includes(h) ? 'rs' : 'rd'}"><td><b>${h}</b></td><td>${p3('100', h)}%</td><td>${p3('40', h)}%</td></tr>`).join('');
+  S.push(`<section class="slide">
+  ${head('3-betting: what changes from 100bb to 40bb', 0.6, 'Button vs a lojack open · PokerCoaching charts at 100bb and 40bb')}
+  <div class="row8">
+    <div><div class="mini-t">100bb</div>${g(X['100'])}</div>
+    <div class="mid-col">
+      <div class="legend3 col"><span><i style="background:${C.red}"></i>3-bet</span><span><i style="background:${C.green}"></i>Call</span><span><i style="background:#46525c"></i>Fold</span></div>
+      <table class="tbl t8"><thead><tr><th>Hand</th><th>3-bet at 100bb</th><th>at 40bb</th></tr></thead><tbody>${rows}</tbody></table>
+      <div class="legend3 col"><span><i class="o-deep"></i>3-bet deep, flat at 40bb</span><span><i class="o-shal"></i>Flat deep, 3-bet at 40bb</span></div>
+    </div>
+    <div><div class="mini-t">40bb</div>${g(X['40'])}</div>
+  </div>
+  <div class="two8">
+    <div class="box" style="border-color:${C.deep}"><b style="color:${C.deep}">100bb:</b> QJs, JTs, 65s and 76s are 3-bets. Deep, a 3-bet pot is big and still has room to play, so you want hands that make straights and flushes and cover low and middle boards. K9s–K6s just call: they make second-best flushes and weak top pairs, which are costly in big pots.</div>
+    <div class="box" style="border-color:${C.shallow}"><b style="color:${C.shallow}">40bb:</b> the lojack can 4-bet jam over your 3-bet, so the bluffs become K9s, K7s and K6s: the king blocks KK and AK, and they fold easily to a jam. QJs, JTs, 65s and 76s now just call: in position at 40bb they play well postflop and hate being jammed off their equity.</div>
   </div>
 </section>`);
+})();
 
 S.push(`<section class="slide">
   ${head('The 3-bet bluff paradox: KTo vs KQo', 0.75, 'Button vs a middle-position open at 50bb')}
@@ -218,7 +227,7 @@ S.push(`<section class="slide">
 
 // calling an open (RFI): small pairs and suited connectors across depths
 (() => {
-  const hl = ['22', '33', '65s', '76s'];
+  const hl = ['33', '65s', '76s'];
   const depths = [['80', 2.3], ['50', 2.2], ['30', 2.3], ['20', 2]];
   const chartOf = (d) => { const c = DATA.depths[d].charts['CO vs UTG · RFI']; const o = {}; ORDER.forEach((h, i) => { o[h] = {}; for (const a of Object.keys(c)) o[h][a] = DIG.indexOf(c[a][i]) / 20; }); return o; };
   const miniGrid = (fr) => {
@@ -246,7 +255,7 @@ S.push(`<section class="slide">
   ${head('Calling an open: deep yes, shallow no', 0.5, 'UTG opens · folds to the cutoff · your charts')}
   <div class="callrow">
     <div class="cgrids">${depths.map(([d], i) => `<div><div class="mini-t">${d}bb</div>${miniGrid(charts[i])}</div>`).join('')}
-      <div class="legend3 left"><span><i style="background:${C.green}"></i>Call</span><span><i style="background:${C.red}"></i>3-bet</span><span><i style="background:${C.amber}"></i>Jam</span><span><i style="background:#46525c"></i>Fold</span><span><i class="hlk"></i>22, 33, 65s, 76s</span></div></div>
+      <div class="legend3 left"><span><i style="background:${C.green}"></i>Call</span><span><i style="background:${C.red}"></i>3-bet</span><span><i style="background:${C.amber}"></i>Jam</span><span><i style="background:#46525c"></i>Fold</span><span><i class="hlk"></i>33, 65s, 76s</span></div></div>
     <table class="tbl hands"><thead><tr><th>Hand</th>${depths.map(([d]) => `<th>${d}bb</th>`).join('')}</tr></thead><tbody>
       ${hl.map((h) => `<tr><td><b>${h}</b></td>${charts.map((c) => `<td>${word(c[h])}</td>`).join('')}</tr>`).join('')}
       <tr class="odds"><td>Behind ÷ call</td>${depths.map(([d, op]) => `<td>${((+d - op) / op).toFixed(0)}×</td>`).join('')}</tr></tbody></table>
@@ -363,17 +372,48 @@ S.push(`<section class="slide">
 
 const bb80 = { r: 15.8, j: 0, c: 65.2 }, bb30 = { r: 6.4, j: 11.1, c: 59.9 }, bb20 = { r: 6.6, j: 13.7, c: 65.7 }, bb12 = { r: 0, j: 20.9, c: 40.5 };
 S.push(`<section class="slide">
-  ${head('New: the re-jam zone (20–35bb)', 0.75)}
+  ${head('The re-jam zone (20–35bb)', 0.75, 'Big blind vs a button open · your charts')}
+  <div class="two wide-l">
+    <div class="pane"><h2>3-bets become all-ins: hand by hand</h2>
+      <table class="tbl ex"><thead><tr><th>Hand</th><th>80bb</th><th>30bb</th><th>What happened</th></tr></thead><tbody>
+        <tr><td><b>AQo</b></td><td class="r">3-bet</td><td class="a">Re-jam</td><td>Value 3-bet becomes a jam: a small 3-bet would commit a third of your stack anyway</td></tr>
+        <tr><td><b>TT</b></td><td class="r">3-bet</td><td class="a">Re-jam 85%</td><td>Same: get it in now, while the opener's weaker hands still call</td></tr>
+        <tr><td><b>66</b></td><td class="c">Call 85%</td><td class="a">Re-jam</td><td>Too shallow to call and set-mine, but great all-in equity and fold equity</td></tr>
+        <tr><td><b>ATo</b></td><td class="c">Call</td><td class="a">Re-jam</td><td>Blocks AA and AK, and is ahead of much of a wide button range</td></tr>
+        <tr><td><b>A5s</b></td><td class="r">3-bet 45%</td><td class="c">Call</td><td>The deep bluff 3-bet becomes a call: it plays well postflop but can't call a jam</td></tr>
+        <tr><td><b>KJo</b></td><td class="c">Call 90%</td><td class="c">Call</td><td>Playable, but behind the hands that call a jam: just call</td></tr>
+      </tbody></table></div>
+    <div class="pane"><h2>The pattern</h2>
+      <ul class="pts"><li>Small 3-bets drop from <b>16%</b> to <b>6%</b> of hands; re-jams rise from <b>0%</b> to <b>11%</b> (14% at 20bb).</li>
+        <li><b>Re-jam</b> pairs and strong aces: good all-in equity, and aces block the opener's best hands.</li>
+        <li><b>Call</b> hands that play well after the flop but can't stand a jam (suited aces, KJo).</li>
+        <li><b>Open smaller</b> (2–2.3bb): the BTN opens 54% at 80bb but 36% at 20bb because the blinds re-jam.</li></ul></div>
+  </div>
+</section>`);
+
+S.push(`<section class="slide">
+  ${head('Calling all-ins: tighter than jamming', 0.85, 'Your charts')}
   <div class="two">
-    <div class="pane"><h2>3-bets become all-ins</h2>
-      <table class="tbl big"><thead><tr><th>BB vs BTN open</th><th>3-bet</th><th>Re-jam</th><th>Call</th></tr></thead><tbody>
-        ${[['80bb', bb80], ['30bb', bb30], ['20bb', bb20], ['12bb', bb12]].map(([d, x]) => `<tr><td>${d}</td><td>${x.r}%</td><td style="color:${C.amber}">${x.j}%</td><td>${x.c}%</td></tr>`).join('')}</tbody></table>
-      <p class="small">From your charts. A small 3-bet at 30bb already commits a third of your stack, so the all-in replaces it.</p></div>
-    <div class="pane"><h2>What changes</h2>
-      <ul class="pts"><li><b>Open smaller</b> (2–2.3bb). The BTN tightens from 54% (80bb) to 45% (30bb) to 36% (20bb) because the blinds re-jam.</li>
-        <li><b>Re-jam with blockers</b> and hands that do well all in: Ax, KQ, KJ, pairs.</li>
-        <li><b>Call jams tighter than you'd jam</b> (the gap concept): you need a hand ahead of their range.</li>
-        <li><b>Postflop</b>: SPR 3–4.5 makes top pair good kicker a stack-off; bet small and plan to get it in.</li></ul></div>
+    <div class="pane"><h2>Big blind facing a button open-shove</h2>
+      <table class="tbl ex"><thead><tr><th>Hand</th><th>20bb shove</th><th>12bb shove</th></tr></thead><tbody>
+        <tr><td><b>A8o</b></td><td class="c">Call</td><td class="c">Call</td></tr>
+        <tr><td><b>QJo</b></td><td class="c">Call 60%</td><td class="c">Call</td></tr>
+        <tr><td><b>KJo</b></td><td class="c">Call 40%</td><td class="c">Call</td></tr>
+        <tr><td><b>KTo</b></td><td class="f">Fold</td><td class="c">Call</td></tr>
+        <tr><td><b>K9s</b></td><td class="f">Fold</td><td class="c">Call</td></tr>
+        <tr><td><b>22</b></td><td class="f">Fold</td><td class="c">Call</td></tr>
+      </tbody></table>
+      <p class="small">Call wider against <b>shorter</b> shoves: the price is better and their range is wider.</p></div>
+    <div class="pane"><h2>Button facing a big-blind re-jam</h2>
+      <table class="tbl ex"><thead><tr><th>Hand</th><th>50bb re-jam</th><th>20bb re-jam</th></tr></thead><tbody>
+        <tr><td><b>AJo</b></td><td class="c">Call 80%</td><td class="c">Call</td></tr>
+        <tr><td><b>ATo</b></td><td class="f">Fold 80%</td><td class="c">Call</td></tr>
+        <tr><td><b>A9o</b></td><td class="f">Fold</td><td class="c">Call</td></tr>
+        <tr><td><b>KQo</b></td><td class="f">Fold</td><td class="c">Call</td></tr>
+        <tr><td><b>66</b></td><td class="f">Fold 65%</td><td class="c">Call</td></tr>
+        <tr><td><b>KJo</b></td><td class="f">Fold</td><td class="f">Fold</td></tr>
+      </tbody></table>
+      <p class="small">You opened every one of these, but you call a 50bb re-jam with far fewer: you need a hand <b>ahead of their jamming range</b>, not just a playable one.</p></div>
   </div>
 </section>`);
 
@@ -381,7 +421,7 @@ const u12s = freq('12', 'UTG · RFI', 'allin'), u12r = freq('12', 'UTG · RFI', 
 const u12 = {};
 for (const h of ORDER) u12[h] = 0;
 S.push(`<section class="slide">
-  ${head('New: push or fold (15bb and under)', 0.97)}
+  ${head('Push or fold (15bb and under)', 0.97)}
   <div class="gridrow">
     <div class="note left"><h3 style="color:${C.amber}">Two-way opens at 12bb</h3><p><b style="color:#ff8a75">Min-raise</b> the best hands (AA–TT, the best suited aces) so they get action, plus a few that can fold.</p><p><b style="color:${C.amber}">Shove</b> the middle: small and medium pairs, offsuit aces and Broadways. They win most when everyone folds and hate being re-jammed.</p></div>
     <div><div class="legend3"><span><i style="background:${C.dark2}"></i>Shove ${pct(u12s).toFixed(0)}%</span><span><i style="background:${C.red}"></i>Min-raise ${pct(u12r).toFixed(0)}%</span></div>${(() => {
@@ -393,25 +433,24 @@ S.push(`<section class="slide">
       }
       return `<div class="g big">${cells}</div>`;
     })()}<div class="mini-p">UTG open · 12bb · your chart</div></div>
-    <div class="note"><h3 style="color:${C.amber}">Facing a shove</h3><p>At 12bb the BB calls a BTN shove with about 28% of hands and an SB shove with about 40%.</p><h3 style="color:${C.amber}">Under 10bb</h3><p>Shove or fold. Each orbit costs about 2.5bb, so shove before you're too short to make anyone fold.</p></div>
+    <div class="note"><h3 style="color:${C.amber}">Under 10bb</h3><p>Shove or fold. Each orbit costs about 2.5bb, so shove before you're too short to make anyone fold.</p><p>Shove wider the later your seat and the shorter your stack.</p></div>
   </div>
 </section>`);
 
 S.push(`<section class="slide">
-  ${head('New: the bubble and risk premium', 0.6)}
-  <div class="two">
-    <div class="pane"><h2>Extra equity needed to call an all-in</h2>
-      <table class="risk"><thead><tr><th>You / they</th><th>Short</th><th>Medium</th><th>Big</th></tr></thead><tbody>
-        <tr><th>Short</th><td class="r2">Moderate</td><td class="r3">High</td><td class="r3">+9–15%</td></tr>
-        <tr><th>Medium</th><td class="r1">Low</td><td class="r4">Very high</td><td class="r4">Very high</td></tr>
-        <tr><th>Big</th><td class="r0">Very low</td><td class="r2">Moderate</td><td class="r4">+18–35%</td></tr></tbody></table>
-      <p class="small">Rough guide (numbers from Jonathan Little; other cells follow the same logic). Near the money, chips you lose cost more than chips you win are worth.</p></div>
-    <div class="pane"><h2>How it plays</h2>
-      <ul class="pts"><li><b>Example:</b> 10bb in the BB vs a 40bb SB shove with any two: you need about 56% (44+, A6s+, A8o+, K6s+, K8o+, Q8s+, JTs), not 43%.</li>
-        <li><b>Big stack:</b> open, 3-bet and defend wider; medium stacks can't fight back.</li>
-        <li><b>Medium stack:</b> avoid the big stacks; pressure other medium and short stacks.</li>
-        <li><b>Short stack:</b> shove, don't min-raise and call off.</li>
-        <li><b>Your charts are chip EV:</b> tighten calls by the risk premium on the bubble.</li></ul></div>
+  ${head('The bubble: why you call less', 0.6, 'Bubble · you have 10bb in the big blind · the 40bb small blind shoves any two cards')}
+  <div class="two wide-l">
+    <div class="pane"><h2>Same hand, different answer</h2>
+      <table class="tbl ex"><thead><tr><th>Your hand</th><th>Equity vs any two</th><th>Normal: need 43%</th><th>Bubble: need ~56%</th></tr></thead><tbody>
+        ${[['55', 61], ['A8o', 60], ['K9o', 58], ['QJo', 58], ['K7o', 55], ['A2o', 55], ['33', 53], ['97s', 49]].map(([h, e]) => `<tr><td><b>${h}</b></td><td>${e}%</td><td class="c">Call</td><td class="${e >= 56 ? 'c' : 'f'}">${e >= 56 ? 'Call' : 'Fold'}</td></tr>`).join('')}
+      </tbody></table>
+      <p class="small">Normally you call 9bb to win 21bb, so 43% equity is enough. On the bubble, busting costs you a sure min-cash and doubling up doesn't double your prize, so you need roughly 12% more.</p></div>
+    <div class="pane"><h2>More examples</h2>
+      <ul class="pts"><li><b>QQ vs AK</b> with two big stacks: QQ is only about 55%, but with both players cashing comfortably you'd need around 70%. <b>Fold.</b></li>
+        <li><b>Big stack vs a short stack's jam:</b> losing barely dents you, so call about as wide as normal.</li>
+        <li><b>Medium stack vs another medium stack:</b> the most dangerous all-in on the bubble. Avoid it without a premium.</li>
+        <li><b>As the big stack,</b> open and shove wider: medium stacks have to fold too much.</li>
+        <li><b>Your charts ignore payouts:</b> on the bubble, call tighter than the charts.</li></ul></div>
   </div>
 </section>`);
 
@@ -455,10 +494,21 @@ body { margin: 0; background: #111; font-family: "Liberation Sans", "Helvetica N
 .gc { aspect-ratio: 1; display: grid; place-items: center; font-size: 15px; font-weight: 700; color: #7f8b93; border-radius: 3px; }
 .gc.on, .gc.add, .gc.keep { color: #fff; }
 .g.small .gc { font-size: 0; border-radius: 2px; }
+.row8 { display: grid; grid-template-columns: auto 1fr auto; gap: 34px; align-items: center; }
+.g.mid8 { width: 560px; gap: 2px; } .g.mid8 .gc { font-size: 12px; }
+.gc.hl-deep { outline: 4px solid #8fc3f2; outline-offset: -2px; position: relative; z-index: 1; }
+.gc.hl-shal { outline: 4px solid #ffb37a; outline-offset: -2px; position: relative; z-index: 1; }
+.mid-col { display: flex; flex-direction: column; gap: 16px; align-items: center; }
+.legend3.col { flex-wrap: wrap; justify-content: center; }
+.legend3 i.o-deep { background: transparent; outline: 4px solid #8fc3f2; outline-offset: -4px; } .legend3 i.o-shal { background: transparent; outline: 4px solid #ffb37a; outline-offset: -4px; }
+.t8 { font-size: 26px; } .t8 td, .t8 th { text-align: center; padding: 8px 10px; } .t8 tr.rs td:first-child { color: #ffb37a; } .t8 tr.rd td:first-child { color: #8fc3f2; }
+.two8 { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; font-size: 24px; } .two8 .box { font-size: 24px; padding: 16px 20px; }
+.two.wide-l { grid-template-columns: 1.35fr 1fr; }
+.tbl.ex { font-size: 25px; } .tbl.ex td { padding: 9px 10px; } .tbl.ex td.c { color: ${C.green}; font-weight: 700; } .tbl.ex td.r { color: #ff8a75; font-weight: 700; } .tbl.ex td.a { color: ${C.amber}; font-weight: 700; } .tbl.ex td.f { color: #8b969d; }
 .gc.hlc { outline: 3px solid #fff; outline-offset: -1px; z-index: 1; position: relative; }
 .callrow { display: grid; grid-template-columns: 1.15fr 1fr; gap: 40px; align-items: center; flex: 1; }
 .cgrids { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px 30px; justify-items: center; }
-.cgrids .g.small { width: 255px; }\n.cgrids { gap: 10px 30px; } .cgrids .mini-t { margin-bottom: 4px; }
+.cgrids .g.small { width: 232px; }\n.cgrids { gap: 10px 30px; } .cgrids .mini-t { margin-bottom: 4px; }
 .legend3.left { grid-column: 1 / -1; justify-content: flex-start; flex-wrap: wrap; }
 .legend3 i.hlk { background: transparent; outline: 3px solid #fff; outline-offset: -3px; }
 .tbl.hands { font-size: 28px; } .tbl.hands td { padding: 14px 12px; } .tbl.hands .mut { color: #8b969d; } .tbl.hands tr.odds td { color: ${C.amber}; font-weight: 800; border-top: 2px solid #9fabb3; }
@@ -509,7 +559,7 @@ body { margin: 0; background: #111; font-family: "Liberation Sans", "Helvetica N
 .bars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; flex: 1; }
 .bcol { background: ${C.panel}; border-radius: 16px; padding: 20px 26px; display: flex; flex-direction: column; }
 .bh { font-size: 34px; font-weight: 800; text-transform: uppercase; } .ba { font-size: 22px; color: ${C.muted}; margin-bottom: 10px; }
-.bplot { flex: 1; display: flex; align-items: flex-end; justify-content: center; gap: 30px; min-height: 260px; border-bottom: 2px solid ${C.line}; }
+.bplot { flex: 1; display: flex; align-items: flex-end; justify-content: center; gap: 30px; min-height: 260px; border-bottom: 2px solid ${C.line}; margin-top: 54px; }
 .bar { width: 120px; border-radius: 8px 8px 0 0; position: relative; } .bar.pot { background: #e8e5de; } .bar span { position: absolute; top: -40px; left: 0; right: 0; text-align: center; font-size: 28px; font-weight: 800; }
 .bl { display: flex; justify-content: center; gap: 70px; font-size: 22px; color: ${C.muted}; margin-top: 8px; } .bs { text-align: center; font-size: 32px; font-weight: 800; margin-top: 10px; }
 .mw { display: flex; align-items: center; justify-content: space-around; background: ${C.panel}; border-radius: 18px; padding: 26px; }
