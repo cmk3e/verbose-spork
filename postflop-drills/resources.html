@@ -32,6 +32,24 @@
   <section class="panel resource">
     <div class="res-head">
       <div>
+        <div class="eyebrow">PDF · 11 pages · US Letter</div>
+        <h2>12bb push / fold / re-jam charts</h2>
+      </div>
+      <div class="btnrow">
+        <a class="btn" href="resources/pushfold-12bb-charts.pdf" target="_blank" rel="noopener">Open PDF</a>
+        <a class="btn ghost" href="resources/pushfold-12bb-charts.pdf" download>Download</a>
+      </div>
+    </div>
+    <p>Every 12bb chart from your PokerCoaching pack, ready to print: what to shove or min-raise from each seat, when to re-jam or call against each opener, which hands call an open-shove, which hands call a re-jam after you min-raise, and big blind vs small blind.</p>
+    <ul class="res-list">
+      <li>90 charts, 12 to a page, grouped by situation</li>
+      <li>Chip EV: on the bubble, call tighter than the charts</li>
+    </ul>
+  </section>
+
+  <section class="panel resource">
+    <div class="res-head">
+      <div>
         <div class="eyebrow">Slide deck · 20 slides · 16:9 PDF</div>
         <h2>Tactical Stack-Size Adjustments</h2>
       </div>
@@ -41,24 +59,6 @@
       </div>
     </div>
     <p>A visual walk from deep stacks to push/fold: the inverse value seesaw, how your lojack range changes from 80bb to 20bb, 3-bet bluffs deep vs shallow (button vs lojack at 100bb and 40bb), KTo vs KQo, calling an open and calling a 3-bet with small pairs and suited connectors, the SPR ladder with worked examples at 40bb and 150bb, multiway pots, effective stacks, the re-jam zone and calling all-ins with hand examples, push/fold, the bubble with hand examples, and a master matrix.</p>
-  </section>
-
-  <section class="panel resource">
-    <div class="res-head">
-      <div>
-        <div class="eyebrow">Player's guide · web page or 14-page PDF · plus a 2-page quick card</div>
-        <h2>Stack Depth &amp; Bubble Strategy</h2>
-      </div>
-      <div class="btnrow">
-        <a class="btn" href="resources/players-guide.html" target="_blank" rel="noopener">Read online</a>
-        <a class="btn ghost" href="resources/players-guide.pdf" target="_blank" rel="noopener">PDF</a>
-        <a class="btn ghost" href="resources/quick-card.pdf" target="_blank" rel="noopener">Quick card</a>
-      </div>
-    </div>
-    <p>For novice and intermediate players: how your play changes from 100bb+ down to push/fold, and on the bubble. One page per stack range (opening, facing an open, facing a 3-bet or jam, postflop, bubble), with numbers from your own charts, range grids that show which hands come in and drop out, an SPR ladder, a risk-premium grid, what to do when the charts and coaches disagree, common mistakes, a 10-question quiz and a glossary. Each page links to the drill that practises it.</p>
-    <ul class="res-list">
-      <li>Quick card: one page of stack-depth rules and one page of bubble rules, made to print and keep at the table</li>
-    </ul>
   </section>
 
   <section class="panel resource">
@@ -80,26 +80,8 @@
     </ul>
   </section>
 
-  <section class="panel resource">
-    <div class="res-head">
-      <div>
-        <div class="eyebrow">PDF · 9 pages · US Letter</div>
-        <h2>Briefing: stack-size adjustments and bubble play</h2>
-      </div>
-      <div class="btnrow">
-        <a class="btn" href="resources/stack-size-briefing.pdf" target="_blank" rel="noopener">Open PDF</a>
-        <a class="btn ghost" href="resources/stack-size-briefing.pdf" download>Download</a>
-      </div>
-    </div>
-    <p>A briefing on two PokerCoaching videos. Matt Affleck's webinar on adjusting ranges as stacks get shallower: which hands gain and lose value at 150bb, 100bb and 50bb, 3-bet bluffs and sizes by depth, effective stacks, and stack-to-pot ratio. Jonathan Little's video on the bubble: ICM, risk premium (the extra equity you need to call or jam), how big, medium and short stacks should play, 22 hand examples, and postflop tips.</p>
-    <ul class="res-list">
-      <li>Cheat sheet of the key numbers and rules of thumb, including the bubble</li>
-      <li>Where the webinar agrees and disagrees with your charts and solver results, and what to drill</li>
-    </ul>
-  </section>
-
   <footer>
-    The range guide is generated from the same data as the drills (tools/make_range_guide.js); briefings are built from Markdown in resources/src (tools/make_briefing.js); the player's guide and quick card come from tools/make_players_guide.js. All can be rebuilt after changes.
+    Built from the same data as the drills (tools/make_range_guide.js, tools/make_slides.js, tools/make_pushfold_charts.js), so each can be rebuilt after changes.
   </footer>
 </div>
 </body>
