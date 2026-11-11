@@ -371,25 +371,38 @@ S.push(`<section class="slide">
 </section>`);
 
 const bb80 = { r: 15.8, j: 0, c: 65.2 }, bb30 = { r: 6.4, j: 11.1, c: 59.9 }, bb20 = { r: 6.6, j: 13.7, c: 65.7 }, bb12 = { r: 0, j: 20.9, c: 40.5 };
-S.push(`<section class="slide">
-  ${head('The re-jam zone (20–35bb)', 0.75, 'Big blind vs a button open · your charts')}
+// re-jam zone: big blind response by opener position (from the chart data)
+(() => {
+  const act = (d, opener, h) => {
+    const c = DATA.depths[d].charts[`BB vs ${opener} · RFI`];
+    const i = ORDER.indexOf(h);
+    const f = {}; for (const k of Object.keys(c)) f[k] = DIG.indexOf(c[k][i]) / 20;
+    const parts = [['allin', 'Re-jam', 'a'], ['raise', '3-bet', 'r'], ['call', 'Call', 'c'], ['fold', 'Fold', 'f']]
+      .filter(([k]) => (f[k] || 0) >= 0.2).sort((x, y) => f[y[0]] - f[x[0]]);
+    const [k, label, cls] = parts[0];
+    const main = `${label}${f[k] < 0.95 ? ' ' + Math.round(f[k] * 100) + '%' : ''}`;
+    const mixed = parts.length > 1;
+    return `<td class="${mixed ? 'm' : cls}">${mixed ? `<span class="${cls}">${main}</span>` : main}</td>`;
+  };
+  const hands = ['AQo', 'TT', '66', 'ATo', 'A5s', 'KJo'];
+  const openers = ['UTG', 'HJ', 'CO', 'BTN'];
+  S.push(`<section class="slide">
+  ${head('The re-jam zone (20–35bb)', 0.75, 'You are in the big blind · your charts')}
   <div class="two wide-l">
-    <div class="pane"><h2>3-bets become all-ins: hand by hand</h2>
-      <table class="tbl ex"><thead><tr><th>Hand</th><th>80bb</th><th>30bb</th><th>What happened</th></tr></thead><tbody>
-        <tr><td><b>AQo</b></td><td class="r">3-bet</td><td class="a">Re-jam</td><td>Value 3-bet becomes a jam: a small 3-bet would commit a third of your stack anyway</td></tr>
-        <tr><td><b>TT</b></td><td class="r">3-bet</td><td class="a">Re-jam 85%</td><td>Same: get it in now, while the opener's weaker hands still call</td></tr>
-        <tr><td><b>66</b></td><td class="c">Call 85%</td><td class="a">Re-jam</td><td>Too shallow to call and set-mine, but great all-in equity and fold equity</td></tr>
-        <tr><td><b>ATo</b></td><td class="c">Call</td><td class="a">Re-jam</td><td>Blocks AA and AK, and is ahead of much of a wide button range</td></tr>
-        <tr><td><b>A5s</b></td><td class="r">3-bet 45%</td><td class="c">Call</td><td>The deep bluff 3-bet becomes a call: it plays well postflop but can't call a jam</td></tr>
-        <tr><td><b>KJo</b></td><td class="c">Call 90%</td><td class="c">Call</td><td>Playable, but behind the hands that call a jam: just call</td></tr>
-      </tbody></table></div>
+    <div class="pane"><h2>Big blind facing an open: it depends who opened</h2>
+      <table class="tbl ex pos"><thead><tr><th>Hand</th><th class="deepc">80bb<br><small>vs BTN</small></th>${openers.map((o) => `<th>30bb<br><small>vs ${o}</small></th>`).join('')}</tr></thead><tbody>
+        ${hands.map((h) => `<tr><td><b>${h}</b></td>${act('80', 'BTN', h).replace('<td class="', '<td class="deepc ')}${openers.map((o) => act('30', o, h)).join('')}</tr>`).join('')}
+      </tbody></table>
+      <p class="small">Each cell shows the main action and how often your chart takes it (no % means always); the rest of the time it mixes in another play.</p></div>
     <div class="pane"><h2>The pattern</h2>
-      <ul class="pts"><li>Small 3-bets drop from <b>16%</b> to <b>6%</b> of hands; re-jams rise from <b>0%</b> to <b>11%</b> (14% at 20bb).</li>
-        <li><b>Re-jam</b> pairs and strong aces: good all-in equity, and aces block the opener's best hands.</li>
-        <li><b>Call</b> hands that play well after the flop but can't stand a jam (suited aces, KJo).</li>
-        <li><b>Open smaller</b> (2–2.3bb): the BTN opens 54% at 80bb but 36% at 20bb because the blinds re-jam.</li></ul></div>
+      <ul class="pts"><li><b>Deep, you 3-bet small or call.</b> At 80bb nothing in this table re-jams.</li>
+        <li><b>At 30bb, the later the opener, the more you re-jam.</b> A button or cutoff opens a wide range that can't call a jam, so 66, ATo and AQo shove against them.</li>
+        <li><b>Against an early opener, mostly call.</b> UTG's tight range calls a jam with the hands that crush you, so 66, ATo and even AQo usually just call.</li>
+        <li><b>Hands that play well after the flop but can't call a jam</b> (A5s, KJo) call at every position.</li>
+        <li>Overall vs a button open: small 3-bets drop from 16% to 6% of hands; re-jams rise from 0% to 11%.</li></ul></div>
   </div>
 </section>`);
+})();
 
 S.push(`<section class="slide">
   ${head('Calling all-ins: tighter than jamming', 0.85, 'Your charts')}
@@ -504,7 +517,8 @@ body { margin: 0; background: #111; font-family: "Liberation Sans", "Helvetica N
 .t8 { font-size: 26px; } .t8 td, .t8 th { text-align: center; padding: 8px 10px; } .t8 tr.rs td:first-child { color: #ffb37a; } .t8 tr.rd td:first-child { color: #8fc3f2; }
 .two8 { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; font-size: 24px; } .two8 .box { font-size: 24px; padding: 16px 20px; }
 .two.wide-l { grid-template-columns: 1.35fr 1fr; }
-.tbl.ex { font-size: 25px; } .tbl.ex td { padding: 9px 10px; } .tbl.ex td.c { color: ${C.green}; font-weight: 700; } .tbl.ex td.r { color: #ff8a75; font-weight: 700; } .tbl.ex td.a { color: ${C.amber}; font-weight: 700; } .tbl.ex td.f { color: #8b969d; }
+.tbl.ex { font-size: 25px; }
+.tbl.pos { font-size: 28px; } .tbl.pos td { padding: 14px 10px; } .tbl.pos th, .tbl.pos td { text-align: center; } .tbl.pos td:first-child, .tbl.pos th:first-child { text-align: left; } .tbl.pos th small { font-weight: 400; text-transform: none; font-size: 18px; } .tbl.pos .deepc { background: #23384c; } .tbl.ex td.m { color: #e9e3d6; font-weight: 700; } .tbl.ex td.m .a { color: ${C.amber}; } .tbl.ex td.m .c { color: ${C.green}; } .tbl.ex td.m .r { color: #ff8a75; } .tbl.ex td { padding: 9px 10px; } .tbl.ex td.c { color: ${C.green}; font-weight: 700; } .tbl.ex td.r { color: #ff8a75; font-weight: 700; } .tbl.ex td.a { color: ${C.amber}; font-weight: 700; } .tbl.ex td.f { color: #8b969d; }
 .gc.hlc { outline: 3px solid #fff; outline-offset: -1px; z-index: 1; position: relative; }
 .callrow { display: grid; grid-template-columns: 1.15fr 1fr; gap: 40px; align-items: center; flex: 1; }
 .cgrids { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px 30px; justify-items: center; }
