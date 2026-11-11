@@ -216,6 +216,45 @@ S.push(`<section class="slide">
   <div class="banner">Flat KQo to keep dominated hands in the pot. 3-bet KTo to fold out better hands.</div>
 </section>`);
 
+// calling an open (RFI): small pairs and suited connectors across depths
+(() => {
+  const hl = ['22', '33', '65s', '76s'];
+  const depths = [['80', 2.3], ['50', 2.2], ['30', 2.3], ['20', 2]];
+  const chartOf = (d) => { const c = DATA.depths[d].charts['CO vs UTG · RFI']; const o = {}; ORDER.forEach((h, i) => { o[h] = {}; for (const a of Object.keys(c)) o[h][a] = DIG.indexOf(c[a][i]) / 20; }); return o; };
+  const miniGrid = (fr) => {
+    let cells = '';
+    for (let r = 0; r < 13; r++) for (let c = 0; c < 13; c++) {
+      const h = handAt(r, c); const f = fr[h]; let x = 0; const st = [];
+      for (const [a, col] of [['call', C.green], ['raise', C.red], ['allin', C.amber]]) { const v = f[a] || 0; if (v > 0) { st.push(`${col} ${x * 100}% ${(x + v) * 100}%`); x += v; } }
+      st.push(`#46525c ${x * 100}% 100%`);
+      cells += `<div class="gc${hl.includes(h) ? ' hlc' : ''}" style="background:linear-gradient(90deg,${st.join(',')})"></div>`;
+    }
+    return `<div class="g small">${cells}</div>`;
+  };
+  const pc = (v) => (v < 1 ? ' ' + Math.round(v * 100) + '%' : '');
+  const word = (f) => {
+    const parts = [];
+    if (f.call > 0) parts.push(`<span style="color:${C.green}">Call${pc(f.call)}</span>`);
+    if (f.raise > 0) parts.push(`<span style="color:${C.red}">3-bet${pc(f.raise)}</span>`);
+    if (f.allin > 0) parts.push(`<span style="color:${C.amber}">Jam${pc(f.allin)}</span>`);
+    if (!parts.length) return '<span class="mut">Fold</span>';
+    if (f.fold > 0.05) parts.push(`<span class="mut">Fold${pc(f.fold)}</span>`);
+    return parts.join(' · ');
+  };
+  const charts = depths.map(([d]) => chartOf(d));
+  S.push(`<section class="slide">
+  ${head('Calling an open: deep yes, shallow no', 0.5, 'UTG opens · folds to the cutoff · your charts')}
+  <div class="callrow">
+    <div class="cgrids">${depths.map(([d], i) => `<div><div class="mini-t">${d}bb</div>${miniGrid(charts[i])}</div>`).join('')}
+      <div class="legend3 left"><span><i style="background:${C.green}"></i>Call</span><span><i style="background:${C.red}"></i>3-bet</span><span><i style="background:${C.amber}"></i>Jam</span><span><i style="background:#46525c"></i>Fold</span><span><i class="hlk"></i>22, 33, 65s, 76s</span></div></div>
+    <table class="tbl hands"><thead><tr><th>Hand</th>${depths.map(([d]) => `<th>${d}bb</th>`).join('')}</tr></thead><tbody>
+      ${hl.map((h) => `<tr><td><b>${h}</b></td>${charts.map((c) => `<td>${word(c[h])}</td>`).join('')}</tr>`).join('')}
+      <tr class="odds"><td>Behind ÷ call</td>${depths.map(([d, op]) => `<td>${((+d - op) / op).toFixed(0)}×</td>`).join('')}</tr></tbody></table>
+  </div>
+  <div class="callout">Calling an open with a small pair or suited connector is a bet on making a big hand and getting paid. With 50bb+ there's 20–35 times the call behind, comfortably above the <b>15–20×</b> set-mining needs. At 30bb (12×) and 20bb (9×) there isn't, and players left to act can squeeze you off the hand, so only 55+ keeps calling.</div>
+</section>`);
+})();
+
 // calling a 3-bet: small pairs and suited connectors across depths
 (() => {
   const hl = ['22', '33', '65s', '76s'];
@@ -247,7 +286,7 @@ S.push(`<section class="slide">
   const charts = depths.map(([d]) => chartOf(d));
   const rfiOf = (d, h) => { const c = DATA.depths[d].charts['BTN · RFI']; const i = ORDER.indexOf(h); const o = {}; for (const k of Object.keys(c)) o[k] = DIG.indexOf(c[k][i]) / 20; return o; };
   S.push(`<section class="slide">
-  ${head('Calling a 3-bet: where small pairs and suited connectors earn their keep', 0.5, 'Button opens · big blind 3-bets · button decides · your charts')}
+  ${head('Calling a 3-bet: the deeper, the more you call', 0.5, 'Button opens · big blind 3-bets · button decides · your charts')}
   <div class="callrow">
     <div class="cgrids">${depths.map(([d], i) => `<div><div class="mini-t">${d}bb</div>${miniGrid(charts[i])}</div>`).join('')}
       <div class="legend3 left"><span><i style="background:${C.green}"></i>Call</span><span><i style="background:${C.amber}"></i>4-bet jam</span><span><i style="background:${C.red}"></i>4-bet</span><span><i style="background:#46525c"></i>Fold</span><span><i class="hlk"></i>22, 33, 65s, 76s</span></div></div>
@@ -419,7 +458,7 @@ body { margin: 0; background: #111; font-family: "Liberation Sans", "Helvetica N
 .gc.hlc { outline: 3px solid #fff; outline-offset: -1px; z-index: 1; position: relative; }
 .callrow { display: grid; grid-template-columns: 1.15fr 1fr; gap: 40px; align-items: center; flex: 1; }
 .cgrids { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px 30px; justify-items: center; }
-.cgrids .g.small { width: 300px; }
+.cgrids .g.small { width: 255px; }\n.cgrids { gap: 10px 30px; } .cgrids .mini-t { margin-bottom: 4px; }
 .legend3.left { grid-column: 1 / -1; justify-content: flex-start; flex-wrap: wrap; }
 .legend3 i.hlk { background: transparent; outline: 3px solid #fff; outline-offset: -3px; }
 .tbl.hands { font-size: 28px; } .tbl.hands td { padding: 14px 12px; } .tbl.hands .mut { color: #8b969d; } .tbl.hands tr.odds td { color: ${C.amber}; font-weight: 800; border-top: 2px solid #9fabb3; }
