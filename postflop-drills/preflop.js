@@ -147,6 +147,10 @@
     spot: null, handIdx: 0, cards: null, answered: false,
   };
 
+  // ?depth=30 (links from the guides) drills one stack depth for this visit
+  const urlDepth = new URLSearchParams(location.search).get('depth');
+  if (!PUSHFOLD && urlDepth && DATA.depths[urlDepth]) state.settings.depth = urlDepth;
+
   function eligibleSpots() {
     return ALL_SPOTS.filter((s) =>
       (PUSHFOLD || state.settings.depth === 'any' || s.depth === state.settings.depth) &&

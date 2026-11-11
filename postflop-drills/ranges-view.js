@@ -24,6 +24,13 @@
     if (saved.resp) state.resp = saved.resp;
     if (saved.flop && FLOPS.includes(saved.flop)) state.flop = saved.flop;
   } catch (e) { /* ignore */ }
+  // ?depth=50&open=LJ&resp=BB&flop=As7d2c (links from the guides) override the saved state
+  try {
+    const q = new URLSearchParams(location.search);
+    if (q.get('depth') && DATA.depths[q.get('depth')]) state.depth = q.get('depth');
+    if (q.has('open')) { state.opener = q.get('open') || null; state.resp = q.get('resp') || null; }
+    if (q.has('flop')) state.flop = FLOPS.includes(q.get('flop')) ? q.get('flop') : '';
+  } catch (e) { /* ignore */ }
   const save = () => { try { localStorage.setItem('prv:state', JSON.stringify(state)); } catch (e) { /* ignore */ } };
 
   const charts = () => DATA.depths[state.depth].charts;

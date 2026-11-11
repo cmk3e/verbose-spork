@@ -1,0 +1,121 @@
+/* Shared styles for the player's guide (web + print) and the quick card (print). */
+:root { --ink: #15211b; --muted: #5a6a61; --line: #d3dbd6; --soft: #f4f6f5; --felt: #1d5640; --raise: #e5483f; --call: #2f8a46; }
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; font-family: "Public Sans", "Helvetica Neue", Arial, sans-serif; color: var(--ink); background: #fff; line-height: 1.45; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+a { color: #1f5fbf; }
+b { font-weight: 700; }
+
+/* ---------- guide: screen */
+.guide main { max-width: 860px; margin: 0 auto; padding: 20px 16px 60px; font-size: 16px; }
+.guide h1 { font-size: 2rem; line-height: 1.1; margin: 4px 0 8px; }
+.guide h2 { font-size: 1.45rem; margin: 0 0 8px; }
+.guide h3 { font-size: 1.1rem; margin: 18px 0 6px; }
+.guide section { margin-top: 36px; }
+.kicker { text-transform: uppercase; letter-spacing: .08em; font-size: .75rem; color: var(--muted); font-weight: 700; margin: 0; }
+.sub { font-size: 1.1rem; color: #3b4a42; margin: 0 0 10px; }
+.howto { margin: 0 0 12px; }
+.lead { font-size: 1.05rem; }
+.toc { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; }
+.toc a { text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; font-size: .85rem; color: var(--ink); background: var(--soft); }
+.forces li, .lessons li { margin-bottom: 6px; }
+.note { color: var(--muted); font-size: .9rem; }
+.cap { font-size: .85rem; color: #3b4a42; margin: 6px 0 18px; }
+.k { font-weight: 700; padding: 0 3px; }
+.k.add { outline: 2px solid var(--call); }
+.k.rem { outline: 2px dashed var(--raise); }
+
+table { width: 100%; border-collapse: collapse; margin: 8px 0 12px; font-size: .9rem; }
+th, td { text-align: left; vertical-align: top; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+thead th { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); border-bottom: 2px solid var(--ink); }
+tbody tr:nth-child(even) td { background: var(--soft); }
+.plan th { width: 9.5em; font-weight: 700; }
+.overview td:first-child { white-space: nowrap; }
+
+.stack-head { border-left: 6px solid var(--felt); padding: 4px 0 4px 12px; margin-bottom: 8px; }
+.band { display: inline-block; background: var(--felt); color: #fff; font-weight: 800; border-radius: 6px; padding: 2px 8px; font-size: .85rem; }
+.stack-head h2 { margin: 6px 0 2px; }
+.when { margin: 0; color: var(--muted); font-size: .9rem; }
+.practise { background: #eaf2ee; border-radius: 8px; padding: 8px 12px; font-size: .9rem; margin-top: 8px; }
+
+/* range grids */
+.grids { display: grid; gap: 10px; }
+.grids.five { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.grids.three { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+figure { margin: 0; }
+figure.grid figcaption { display: flex; justify-content: space-between; gap: 4px; font-size: .8rem; margin-bottom: 3px; }
+figure.grid figcaption small { color: var(--muted); }
+.g { display: grid; grid-template-columns: repeat(13, 1fr); gap: 1px; }
+.g .c { aspect-ratio: 1 / 1; min-width: 0; min-height: 0; line-height: 1; display: grid; place-items: center; font: 600 clamp(4px, 1.1vw, 7px) Menlo, Consolas, monospace; color: #13221a; overflow: hidden; }
+.grids.five .g .c { font-size: 0; }
+.g .c.o { color: #b2bbb6; }
+.g .c.add { outline: 2px solid var(--call); outline-offset: -2px; }
+.g .c.rem { outline: 2px dashed var(--raise); outline-offset: -2px; }
+.lg { display: flex; flex-wrap: wrap; gap: 8px; font-size: .72rem; margin-top: 3px; color: #3b4a42; }
+.lg i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 3px; vertical-align: -1px; }
+
+/* heat table */
+.heat td, .heat th { text-align: center; }
+.heat td:first-child, .heat th:first-child, .heat .why { text-align: left; }
+.heat .why { color: var(--muted); font-size: .8rem; }
+.dots { letter-spacing: 1px; font-size: .8rem; }
+.heat td.h3 { background: #cfe8d6 !important; } .heat td.h2 { background: #eef4e0 !important; } .heat td.h1 { background: #f9ece9 !important; }
+.d3 { color: #1f6b38; } .d2 { color: #6b7a2a; } .d1 { color: #a0463e; }
+
+/* risk grid */
+.risk th, .risk td { text-align: center; }
+.risk tbody th { text-align: left; }
+.risk td { font-weight: 600; }
+.risk td.r0 { background: #e3f1e7 !important; } .risk td.r1 { background: #eef4e0 !important; } .risk td.r2 { background: #fbf0d6 !important; }
+.risk td.r3 { background: #f8d9c7 !important; } .risk td.r4 { background: #f2b7ae !important; }
+
+.quiz li, .answers li { margin-bottom: 6px; }
+.gloss { display: grid; grid-template-columns: 11em 1fr; gap: 4px 12px; margin: 6px 0 12px; }
+.gloss dt { font-weight: 700; }
+.gloss dd { margin: 0; }
+@media (max-width: 560px) {
+  .gloss { grid-template-columns: 1fr; } .gloss dd { margin-bottom: 6px; }
+  .plan th { width: auto; display: block; border-bottom: 0; padding-bottom: 0; } .plan td { display: block; }
+  table { font-size: .85rem; }
+}
+
+/* ---------- print (guide) */
+@page { size: Letter; margin: 0.5in 0.55in; }
+@media print {
+  .guide main { max-width: none; padding: 0; font-size: 10pt; }
+  .guide h1 { font-size: 26pt; }
+  .guide h2 { font-size: 16pt; }
+  .guide section { margin-top: 0; }
+  .guide section.stack, .guide #bubble, .guide #quiz, .guide #glossary { break-before: page; }
+  .guide #basics, .guide #disagree { margin-top: 22px; }
+  .guide #mistakes { margin-top: 18px; }
+  .toc { display: none; }
+  table, figure, .grids, .practise, tr { break-inside: avoid; }
+  h2, h3, .stack-head { break-after: avoid; }
+  .g .c { font-size: 4.2pt; }
+  .grids.five .g .c { font-size: 0; }
+  .grids.five { grid-template-columns: repeat(5, 1fr); }
+  .grids.three { grid-template-columns: repeat(3, 1fr); }
+  .practise a { color: #1f5fbf; text-decoration: none; }
+  table { font-size: 8.8pt; }
+}
+
+/* ---------- quick card (print only) */
+.card { font-size: 8.4pt; }
+.card-page { break-after: page; }
+.card-page:last-child { break-after: auto; }
+.card h1 { font-size: 17pt; margin: 0 0 2px; }
+.card h2 { font-size: 11pt; margin: 10px 0 4px; }
+.card .sub { font-size: 9pt; margin-bottom: 6px; }
+.card table { font-size: 7.8pt; margin: 4px 0 6px; }
+.card th, .card td { padding: 3px 5px; }
+.card .qc tbody th { width: 6.5em; }
+.card .cap { font-size: 7.2pt; margin: 2px 0 8px; }
+.card .tight { margin: 0; padding-left: 16px; } .card .tight li { margin-bottom: 3px; }
+@media screen and (max-width: 560px) {
+  .heat .why { display: none; }
+  .heat th, .heat td { padding: 5px 3px; }
+  .heat thead th { font-size: .62rem; letter-spacing: 0; }
+  .heat td:first-child { font-size: .78rem; }
+  .dots { font-size: .62rem; letter-spacing: 0; }
+}

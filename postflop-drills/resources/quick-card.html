@@ -1,0 +1,146 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Stack depth &amp; bubble quick card</title><style>/* Shared styles for the player's guide (web + print) and the quick card (print). */
+:root { --ink: #15211b; --muted: #5a6a61; --line: #d3dbd6; --soft: #f4f6f5; --felt: #1d5640; --raise: #e5483f; --call: #2f8a46; }
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; font-family: "Public Sans", "Helvetica Neue", Arial, sans-serif; color: var(--ink); background: #fff; line-height: 1.45; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+a { color: #1f5fbf; }
+b { font-weight: 700; }
+
+/* ---------- guide: screen */
+.guide main { max-width: 860px; margin: 0 auto; padding: 20px 16px 60px; font-size: 16px; }
+.guide h1 { font-size: 2rem; line-height: 1.1; margin: 4px 0 8px; }
+.guide h2 { font-size: 1.45rem; margin: 0 0 8px; }
+.guide h3 { font-size: 1.1rem; margin: 18px 0 6px; }
+.guide section { margin-top: 36px; }
+.kicker { text-transform: uppercase; letter-spacing: .08em; font-size: .75rem; color: var(--muted); font-weight: 700; margin: 0; }
+.sub { font-size: 1.1rem; color: #3b4a42; margin: 0 0 10px; }
+.howto { margin: 0 0 12px; }
+.lead { font-size: 1.05rem; }
+.toc { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; }
+.toc a { text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; font-size: .85rem; color: var(--ink); background: var(--soft); }
+.forces li, .lessons li { margin-bottom: 6px; }
+.note { color: var(--muted); font-size: .9rem; }
+.cap { font-size: .85rem; color: #3b4a42; margin: 6px 0 18px; }
+.k { font-weight: 700; padding: 0 3px; }
+.k.add { outline: 2px solid var(--call); }
+.k.rem { outline: 2px dashed var(--raise); }
+
+table { width: 100%; border-collapse: collapse; margin: 8px 0 12px; font-size: .9rem; }
+th, td { text-align: left; vertical-align: top; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+thead th { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); border-bottom: 2px solid var(--ink); }
+tbody tr:nth-child(even) td { background: var(--soft); }
+.plan th { width: 9.5em; font-weight: 700; }
+.overview td:first-child { white-space: nowrap; }
+
+.stack-head { border-left: 6px solid var(--felt); padding: 4px 0 4px 12px; margin-bottom: 8px; }
+.band { display: inline-block; background: var(--felt); color: #fff; font-weight: 800; border-radius: 6px; padding: 2px 8px; font-size: .85rem; }
+.stack-head h2 { margin: 6px 0 2px; }
+.when { margin: 0; color: var(--muted); font-size: .9rem; }
+.practise { background: #eaf2ee; border-radius: 8px; padding: 8px 12px; font-size: .9rem; margin-top: 8px; }
+
+/* range grids */
+.grids { display: grid; gap: 10px; }
+.grids.five { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.grids.three { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+figure { margin: 0; }
+figure.grid figcaption { display: flex; justify-content: space-between; gap: 4px; font-size: .8rem; margin-bottom: 3px; }
+figure.grid figcaption small { color: var(--muted); }
+.g { display: grid; grid-template-columns: repeat(13, 1fr); gap: 1px; }
+.g .c { aspect-ratio: 1 / 1; min-width: 0; min-height: 0; line-height: 1; display: grid; place-items: center; font: 600 clamp(4px, 1.1vw, 7px) Menlo, Consolas, monospace; color: #13221a; overflow: hidden; }
+.grids.five .g .c { font-size: 0; }
+.g .c.o { color: #b2bbb6; }
+.g .c.add { outline: 2px solid var(--call); outline-offset: -2px; }
+.g .c.rem { outline: 2px dashed var(--raise); outline-offset: -2px; }
+.lg { display: flex; flex-wrap: wrap; gap: 8px; font-size: .72rem; margin-top: 3px; color: #3b4a42; }
+.lg i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 3px; vertical-align: -1px; }
+
+/* heat table */
+.heat td, .heat th { text-align: center; }
+.heat td:first-child, .heat th:first-child, .heat .why { text-align: left; }
+.heat .why { color: var(--muted); font-size: .8rem; }
+.dots { letter-spacing: 1px; font-size: .8rem; }
+.heat td.h3 { background: #cfe8d6 !important; } .heat td.h2 { background: #eef4e0 !important; } .heat td.h1 { background: #f9ece9 !important; }
+.d3 { color: #1f6b38; } .d2 { color: #6b7a2a; } .d1 { color: #a0463e; }
+
+/* risk grid */
+.risk th, .risk td { text-align: center; }
+.risk tbody th { text-align: left; }
+.risk td { font-weight: 600; }
+.risk td.r0 { background: #e3f1e7 !important; } .risk td.r1 { background: #eef4e0 !important; } .risk td.r2 { background: #fbf0d6 !important; }
+.risk td.r3 { background: #f8d9c7 !important; } .risk td.r4 { background: #f2b7ae !important; }
+
+.quiz li, .answers li { margin-bottom: 6px; }
+.gloss { display: grid; grid-template-columns: 11em 1fr; gap: 4px 12px; margin: 6px 0 12px; }
+.gloss dt { font-weight: 700; }
+.gloss dd { margin: 0; }
+@media (max-width: 560px) {
+  .gloss { grid-template-columns: 1fr; } .gloss dd { margin-bottom: 6px; }
+  .plan th { width: auto; display: block; border-bottom: 0; padding-bottom: 0; } .plan td { display: block; }
+  table { font-size: .85rem; }
+}
+
+/* ---------- print (guide) */
+@page { size: Letter; margin: 0.5in 0.55in; }
+@media print {
+  .guide main { max-width: none; padding: 0; font-size: 10pt; }
+  .guide h1 { font-size: 26pt; }
+  .guide h2 { font-size: 16pt; }
+  .guide section { margin-top: 0; }
+  .guide section.stack, .guide #bubble, .guide #quiz, .guide #glossary { break-before: page; }
+  .guide #basics, .guide #disagree { margin-top: 22px; }
+  .guide #mistakes { margin-top: 18px; }
+  .toc { display: none; }
+  table, figure, .grids, .practise, tr { break-inside: avoid; }
+  h2, h3, .stack-head { break-after: avoid; }
+  .g .c { font-size: 4.2pt; }
+  .grids.five .g .c { font-size: 0; }
+  .grids.five { grid-template-columns: repeat(5, 1fr); }
+  .grids.three { grid-template-columns: repeat(3, 1fr); }
+  .practise a { color: #1f5fbf; text-decoration: none; }
+  table { font-size: 8.8pt; }
+}
+
+/* ---------- quick card (print only) */
+.card { font-size: 8.4pt; }
+.card-page { break-after: page; }
+.card-page:last-child { break-after: auto; }
+.card h1 { font-size: 17pt; margin: 0 0 2px; }
+.card h2 { font-size: 11pt; margin: 10px 0 4px; }
+.card .sub { font-size: 9pt; margin-bottom: 6px; }
+.card table { font-size: 7.8pt; margin: 4px 0 6px; }
+.card th, .card td { padding: 3px 5px; }
+.card .qc tbody th { width: 6.5em; }
+.card .cap { font-size: 7.2pt; margin: 2px 0 8px; }
+.card .tight { margin: 0; padding-left: 16px; } .card .tight li { margin-bottom: 3px; }
+@media screen and (max-width: 560px) {
+  .heat .why { display: none; }
+  .heat th, .heat td { padding: 5px 3px; }
+  .heat thead th { font-size: .62rem; letter-spacing: 0; }
+  .heat td:first-child { font-size: .78rem; }
+  .dots { font-size: .62rem; letter-spacing: 0; }
+}
+</style></head><body class="card"><section class="card-page">
+    <h1>Stack depth quick card</h1>
+    <p class="sub">Use the <b>effective stack</b>. Same number of hands, different hands; weaker hands get all in as stacks shrink.</p>
+    <table class="qc"><thead><tr><th>Stack</th><th>Open</th><th>Facing an open</th><th>Facing a 3-bet or jam</th><th>Postflop</th></tr></thead><tbody>
+      <tr><th>100bb+</th><td>Suited, connected, small pairs, suited aces</td><td>Call in position; 3-bet polarised (A5s, suited connectors as bluffs)</td><td>Call wide in position; set-mine</td><td>Two pair+ to stack off; pot-control one pair</td></tr><tr><th>40–60bb</th><td>Same %, swap small pairs and small SCs for KJo, KTo, ATo, A9o</td><td>3-bet bluffs with blockers (KJo, KTo, ATo, A9s–A6s); 3-bet AQ, AJs for value</td><td>Call less; 4-bet jam appears; no set-mining</td><td>SRP: top pair good kicker strong; 3-bet pot: any top pair commits</td></tr><tr><th>20–35bb</th><td>Smaller opens; BTN tightens; some jams at 20bb</td><td>Re-jam or call; small 3-bets vanish</td><td>Calling a jam needs a hand ahead of their range</td><td>Top pair good kicker = stack off; bet small</td></tr><tr><th>10–20bb</th><td>Min-raise premiums; open-shove the middle hands</td><td>Re-jam or fold (BB can call a min-raise)</td><td>Call shoves with hands ahead of the jam range</td><td>After a min-raise: any pair or good draw</td></tr><tr><th>Under 10bb</th><td>Push or fold; wider the later and shorter</td><td>—</td><td>Call wider against shorter shoves</td><td>—</td></tr></tbody></table>
+    <figure class="spr"><svg viewBox="0 0 760 176" width="100%" role="img" aria-label="SPR ladder"><text x="20" y="14" font-size="11" fill="#5a6a61">Deep (high SPR)</text><text x="740" y="14" text-anchor="end" font-size="11" fill="#5a6a61">Shallow (low SPR)</text><rect x="20" y="22" width="144" height="40" fill="#3d79b8"/><text x="92" y="38" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">Nut hands only</text><text x="92" y="54" text-anchor="middle" font-size="10" fill="#fff">SPR 13+</text><rect x="164" y="22" width="144" height="40" fill="#7aa3cf"/><text x="236" y="38" text-anchor="middle" font-size="11" font-weight="700" fill="#13221a">Two pair or sets</text><text x="236" y="54" text-anchor="middle" font-size="10" fill="#13221a">SPR 7–13</text><rect x="308" y="22" width="144" height="40" fill="#c9d47e"/><text x="380" y="38" text-anchor="middle" font-size="11" font-weight="700" fill="#13221a">Top pair: be careful</text><text x="380" y="54" text-anchor="middle" font-size="10" fill="#13221a">SPR 4–7</text><rect x="452" y="22" width="144" height="40" fill="#f0a24a"/><text x="524" y="38" text-anchor="middle" font-size="11" font-weight="700" fill="#13221a">Top pair, overpair</text><text x="524" y="54" text-anchor="middle" font-size="10" fill="#13221a">SPR 2–4</text><rect x="596" y="22" width="144" height="40" fill="#e5483f"/><text x="668" y="38" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">Any pair, good draw</text><text x="668" y="54" text-anchor="middle" font-size="10" fill="#fff">SPR 0–2</text><line x1="171.20000000000002" y1="62" x2="171.20000000000002" y2="82" stroke="#13221a" stroke-width="1"/><circle cx="171.20000000000002" cy="62" r="3.5" fill="#13221a"/><text x="171.20000000000002" y="92" text-anchor="middle" font-size="10.5" fill="#13221a">100bb single-raised pot (12.7)</text><line x1="281.6" y1="62" x2="281.6" y2="108" stroke="#13221a" stroke-width="1"/><circle cx="281.6" cy="62" r="3.5" fill="#13221a"/><text x="281.6" y="118" text-anchor="middle" font-size="10.5" fill="#13221a">50bb single-raised pot (8.1)</text><line x1="428" y1="62" x2="428" y2="134" stroke="#13221a" stroke-width="1"/><circle cx="428" cy="62" r="3.5" fill="#13221a"/><text x="428" y="144" text-anchor="middle" font-size="10.5" fill="#13221a">30bb SRP / 100bb 3-bet pot (4.5)</text><line x1="502.40000000000003" y1="62" x2="502.40000000000003" y2="82" stroke="#13221a" stroke-width="1"/><circle cx="502.40000000000003" cy="62" r="3.5" fill="#13221a"/><text x="502.40000000000003" y="92" text-anchor="middle" font-size="10.5" fill="#13221a">20bb single-raised pot (3.3)</text><line x1="581.6" y1="62" x2="581.6" y2="108" stroke="#13221a" stroke-width="1"/><circle cx="581.6" cy="62" r="3.5" fill="#13221a"/><text x="581.6" y="118" text-anchor="middle" font-size="10.5" fill="#13221a">50bb 3-bet pot (2.2)</text><line x1="610.4" y1="62" x2="610.4" y2="134" stroke="#13221a" stroke-width="1"/><circle cx="610.4" cy="62" r="3.5" fill="#13221a"/><text x="610.4" y="144" text-anchor="middle" font-size="10.5" fill="#13221a">12bb min-raise called (1.8)</text></svg></figure>
+    <p class="cap"><b>Figure 4. The SPR ladder: how strong a hand you need to get all the chips in.</b> Each band names the weakest hand that is usually strong enough to stack off at that SPR (rough guide). Dots mark typical spots from your charts and solves (BB ante, about 2.2bb opens).</p>
+    <table class="heat"><thead><tr><th>Hand type</th><th>100bb+</th><th>40–60bb</th><th>20–35bb</th><th>10–20bb</th><th>Under 10bb</th><th>Why</th></tr></thead><tbody><tr><td>Small pairs (22–66)</td><td class="h3"><span class="dots d3">●●●</span></td><td class="h1"><span class="dots d1">●○○</span></td><td class="h1"><span class="dots d1">●○○</span></td><td class="h3"><span class="dots d3">●●●</span></td><td class="h3"><span class="dots d3">●●●</span></td><td class="why">set-mining deep; all-in equity short</td></tr><tr><td>Suited connectors (54s–T9s)</td><td class="h3"><span class="dots d3">●●●</span></td><td class="h2"><span class="dots d2">●●○</span></td><td class="h1"><span class="dots d1">●○○</span></td><td class="h1"><span class="dots d1">●○○</span></td><td class="h1"><span class="dots d1">●○○</span></td><td class="why">need deep stacks to pay off</td></tr><tr><td>Suited wheel aces (A2s–A5s)</td><td class="h3"><span class="dots d3">●●●</span></td><td class="h2"><span class="dots d2">●●○</span></td><td class="h2"><span class="dots d2">●●○</span></td><td class="h3"><span class="dots d3">●●●</span></td><td class="h3"><span class="dots d3">●●●</span></td><td class="why">flush/wheel deep; ace blocker short</td></tr><tr><td>Offsuit Broadways (KJo, QJo, KTo)</td><td class="h1"><span class="dots d1">●○○</span></td><td class="h3"><span class="dots d3">●●●</span></td><td class="h3"><span class="dots d3">●●●</span></td><td class="h3"><span class="dots d3">●●●</span></td><td class="h2"><span class="dots d2">●●○</span></td><td class="why">make top pairs you can stack off with</td></tr><tr><td>Weak offsuit aces (A2o–A9o)</td><td class="h1"><span class="dots d1">●○○</span></td><td class="h1"><span class="dots d1">●○○</span></td><td class="h2"><span class="dots d2">●●○</span></td><td class="h3"><span class="dots d3">●●●</span></td><td class="h3"><span class="dots d3">●●●</span></td><td class="why">blockers and all-in equity</td></tr><tr><td>Big pairs and AK</td><td class="h3"><span class="dots d3">●●●</span></td><td class="h3"><span class="dots d3">●●●</span></td><td class="h3"><span class="dots d3">●●●</span></td><td class="h3"><span class="dots d3">●●●</span></td><td class="h3"><span class="dots d3">●●●</span></td><td class="why">always good; play bigger pots shallower</td></tr></tbody></table>
+    <p class="cap"><b>Figure 3. Which hands gain and lose value.</b> ●●● = most valuable at that depth. Small pairs and wheel aces are worth most at both ends: deep for their big hands, short because all-in equity and an ace blocker are what matter.</p>
+  </section><section class="card-page">
+    <h1>Bubble quick card</h1>
+    <p class="sub">Chips lost cost more than chips won are worth. Required equity = pot odds + risk premium.</p>
+    <table class="risk"><thead><tr><th>You are… / they are…</th><th>Short stack</th><th>Medium stack</th><th>Big stack</th></tr></thead><tbody><tr><th>Short stack</th><td class="r2">Moderate</td><td class="r3">High</td><td class="r3">High · +9–15%</td></tr><tr><th>Medium stack</th><td class="r1">Low</td><td class="r4">Very high</td><td class="r4">Very high</td></tr><tr><th>Big stack</th><td class="r0">Very low</td><td class="r2">Moderate</td><td class="r4">Highest · +18–35%</td></tr></tbody></table>
+    <p class="cap"><b>Figure 5. Risk premium on the bubble: extra equity you need, on top of pot odds, to call an all-in (or make one).</b> The two numbers come from Jonathan Little's guide; the rest is the same logic: the more a loss costs you and the less a win helps, the higher it is. Rough guide only: real spots depend on every stack in the tournament.</p>
+    <table class="qc"><tbody>
+      <tr><th>Big stack</th><td>Open, 3-bet and defend wider; small bets postflop; fold when clearly behind or nobody folds.</td></tr>
+      <tr><th>Medium stack</th><td>Avoid big stacks (tighten with one on your left); pressure medium and short stacks.</td></tr>
+      <tr><th>Short stack</th><td>Shove, don't min-raise and call off; fold marginal call-offs; pressure other short stacks.</td></tr>
+      <tr><th>Bluffs</th><td>Hold an ace: it blocks the hands that call or jam.</td></tr>
+      <tr><th>Example</th><td>10bb BB vs 40bb SB jam: need ~56% (44+, A6s+, A8o+, K6s+, K8o+, Q8s+, JTs).</td></tr>
+      <tr><th>Payouts</th><td>Care about pay jumps that matter; don't lock up early for a min-cash.</td></tr>
+    </tbody></table>
+    <h2>Top mistakes</h2>
+    <ol class="tight"><li><b>Calling 3-bets with small pairs at 40bb or less.</b> Fold them: set-mining needs about 15–20 times the call behind. Call opens with them only in position or in the big blind.</li><li><b>Stacking off with one pair when 150bb+ deep.</b> Keep pots small with one pair deep; get it in with two pair or better.</li><li><b>Opening the same hands at every depth.</b> Swap small pairs and small suited connectors for offsuit Broadways as you get shorter (Figure 1).</li><li><b>Making 3-bets you can't call a jam with, at 20–35bb.</b> Re-jam or flat instead; small 3-bets with medium hands get shoved on.</li><li><b>Min-raising at 15bb, then calling off light.</b> Shove the hands you don't want to face a re-jam with; min-raise only hands happy to call or easy to fold.</li><li><b>Calling jams as wide as you would shove.</b> Calling needs a hand ahead of their range; your calling range should be clearly tighter than your shoving range.</li></ol>
+  </section></body></html>
