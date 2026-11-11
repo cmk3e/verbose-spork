@@ -119,3 +119,9 @@ figure.grid figcaption small { color: var(--muted); }
   .heat td:first-child { font-size: .78rem; }
   .dots { font-size: .62rem; letter-spacing: 0; }
 }
+
+/* calling-range figure */
+.grids.four { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+.g .c.hl { outline: 2.5px solid #13221a; outline-offset: -2px; z-index: 1; }
+.odds td, .odds th { text-align: center; } .odds td:first-child, .odds th:first-child { text-align: left; }
+@media print { .grids.four { grid-template-columns: repeat(4, 1fr); } }

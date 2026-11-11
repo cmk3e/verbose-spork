@@ -184,7 +184,8 @@
     // ?only=<category>|<position> (from the leaks page) drills just that spot type and seat
     const only = (params.get('only') || '').split('|');
     if (only[0]) {
-      const os = ALL_SPOTS.filter((x) => x.cat === only[0] && (!only[1] || x.hero === only[1]));
+      const os = ALL_SPOTS.filter((x) => x.cat === only[0] && (!only[1] || x.hero === only[1]) &&
+        (PUSHFOLD || state.settings.depth === 'any' || x.depth === state.settings.depth));
       if (os.length) spots = os;
     }
     if (H && state.settings.focus && !only[0]) {

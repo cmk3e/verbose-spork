@@ -39,7 +39,7 @@ function share(fr, action) {
   return s / 1326 * 100;
 }
 
-function gridHTML(fr, title, sub, prev, labels) {
+function gridHTML(fr, title, sub, prev, labels, hl) {
   let cells = '';
   for (let r = 0; r < 13; r++) {
     for (let c = 0; c < 13; c++) {
@@ -60,6 +60,7 @@ function gridHTML(fr, title, sub, prev, labels) {
         if (d >= 0.5) mark = ' add';
         else if (d <= -0.5) mark = ' rem';
       }
+      if (hl && hl.includes(h)) mark += ' hl';
       cells += `<div class="c${mark}${x > 0 ? '' : ' o'}" style="background:linear-gradient(90deg,${stops.join(',')})">${h}</div>`;
     }
   }
@@ -79,13 +80,27 @@ function figLJ() {
     return g;
   });
   return `<div class="grids five">${out.join('')}</div>
-    <p class="cap"><b>Figure 1. How one open range changes with depth</b> (lojack, your charts; same layout as every chart: pairs on the diagonal, suited hands above it, offsuit below). <span class="k add">green outline</span> = comes into the range at this depth; <span class="k rem">dashed red</span> = drops out. Same size of range, different hands: small pairs and small suited connectors leave; offsuit Broadways and offsuit aces come in; at 12bb most opens become all-ins.</p>`;
+    <p class="cap"><b>Figure 2. How one open range changes with depth</b> (lojack, your charts; same layout as every chart: pairs on the diagonal, suited hands above it, offsuit below). <span class="k add">green outline</span> = comes into the range at this depth; <span class="k rem">dashed red</span> = drops out. Same size of range, different hands: small pairs and small suited connectors leave; offsuit Broadways and offsuit aces come in; at 12bb most opens become all-ins.</p>`;
 }
 
 function figBB() {
   const lab = { raise: '3-bet', allin: 'All-in', call: 'Call' };
   return `<div class="grids three">${['80', '30', '12'].map((d) => gridHTML(chart(d, 'BB vs BTN · RFI'), `BB vs BTN open · ${d}bb`, null, null, lab)).join('')}</div>
-    <p class="cap"><b>Figure 2. The big blind against a button open.</b> Deep, the BB 3-bets to a normal size (red). From about 30bb those 3-bets become all-in re-jams (dark red), and at 12bb the BB either jams or calls the cheap min-raise.</p>`;
+    <p class="cap"><b>Figure 3. The big blind against a button open.</b> Deep, the BB 3-bets to a normal size (red). From about 30bb those 3-bets become all-in re-jams (dark red), and at 12bb the BB either jams or calls the cheap min-raise.</p>`;
+}
+
+function figCall() {
+  const hl = ['22', '33', '65s', '76s'];
+  const lab = { call: 'Call', allin: '4-bet jam', raise: '4-bet' };
+  const sizes = [['80', 10, 2.3], ['50', 8.8, 2.2], ['30', 8, 2.3], ['20', 6.6, 2]];
+  const rows = sizes.map(([d, tb, op]) => {
+    const call = +(tb - op).toFixed(1), behind = +(+d - tb).toFixed(1);
+    return `<tr><td><b>${d}bb</b></td><td>${tb}bb</td><td>${call}bb</td><td>${behind}bb</td><td><b>${(behind / call).toFixed(0)}×</b></td></tr>`;
+  }).join('');
+  return `<div class="grids four">${sizes.map(([d]) => gridHTML(chart(d, 'BTN vs BB · 3-Bet'), `BTN vs BB 3-bet · ${d}bb`, null, null, lab, hl)).join('')}</div>
+    <p class="cap"><b>Figure 4. Calling a 3-bet: where small pairs and suited connectors earn their keep.</b> The button opens, the big blind 3-bets, and the button decides (your charts). Outlined: 22, 33, 65s and 76s. At 80bb all four call every time. At 50bb 65s and 76s still call, but 22 and 33 switch to 4-bet jams (they can't hit a set often enough to pay for the call). At 30bb the button no longer opens 22, mostly folds 33, and folds 65s and 76s to the 3-bet. At 20bb it open-jams 22–44 rather than raising, and still folds the suited connectors to a 3-bet. Small pairs and suited connectors make up 23% of the button's calls at 80bb but only 10–13% at 30–20bb.</p>
+    <table class="odds"><thead><tr><th>Stack</th><th>BB 3-bets to</th><th>BTN must call</th><th>Left behind</th><th>Behind ÷ call</th></tr></thead><tbody>${rows}</tbody></table>
+    <p class="cap">Why: you flop a set only about 1 time in 8.5, so pure set-mining needs roughly 15–20 times the call still behind (the "implied odds"). Suited connectors need deep stacks for the same reason. At 80bb, in position, there is enough with the hands' other equity; at 30bb there is barely 4× and calling can't pay.</p>`;
 }
 
 function figValue() {
@@ -101,7 +116,7 @@ function figValue() {
   const dot = (n) => `<span class="dots d${n}">${'●'.repeat(n)}${'○'.repeat(3 - n)}</span>`;
   return `<table class="heat"><thead><tr><th>Hand type</th>${cols.map((c) => `<th>${c}</th>`).join('')}<th>Why</th></tr></thead><tbody>${
     rows.map(([n, v, why]) => `<tr><td>${n}</td>${v.map((x) => `<td class="h${x}">${dot(x)}</td>`).join('')}<td class="why">${why}</td></tr>`).join('')}</tbody></table>
-    <p class="cap"><b>Figure 3. Which hands gain and lose value.</b> ●●● = most valuable at that depth. Small pairs and wheel aces are worth most at both ends: deep for their big hands, short because all-in equity and an ace blocker are what matter.</p>`;
+    <p class="cap"><b>Figure 1. Which hands gain and lose value.</b> ●●● = most valuable at that depth. Small pairs and wheel aces are worth most at both ends: deep for their big hands, short because all-in equity and an ace blocker are what matter.</p>`;
 }
 
 function figSPR() {
@@ -140,7 +155,7 @@ function figSPR() {
   }
   svg += '</svg>';
   return `<figure class="spr">${svg}</figure>
-    <p class="cap"><b>Figure 4. The SPR ladder: how strong a hand you need to get all the chips in.</b> Each band names the weakest hand that is usually strong enough to stack off at that SPR (rough guide). Dots mark typical spots from your charts and solves (BB ante, about 2.2bb opens).</p>`;
+    <p class="cap"><b>Figure 5. The SPR ladder: how strong a hand you need to get all the chips in.</b> Each band names the weakest hand that is usually strong enough to stack off at that SPR (rough guide). Dots mark typical spots from your charts and solves (BB ante, about 2.2bb opens).</p>`;
 }
 
 function figRisk() {
@@ -152,7 +167,7 @@ function figRisk() {
   ];
   return `<table class="risk"><thead><tr><th>You are… / they are…</th><th>Short stack</th><th>Medium stack</th><th>Big stack</th></tr></thead><tbody>${
     rows.map((r, i) => `<tr><th>${r}</th>${cells[i].map(([t, k]) => `<td class="r${k}">${t}</td>`).join('')}</tr>`).join('')}</tbody></table>
-    <p class="cap"><b>Figure 5. Risk premium on the bubble: extra equity you need, on top of pot odds, to call an all-in (or make one).</b> The two numbers come from Jonathan Little's guide; the rest is the same logic: the more a loss costs you and the less a win helps, the higher it is. Rough guide only: real spots depend on every stack in the tournament.</p>`;
+    <p class="cap"><b>Figure 6. Risk premium on the bubble: extra equity you need, on top of pot odds, to call an all-in (or make one).</b> The two numbers come from Jonathan Little's guide; the rest is the same logic: the more a loss costs you and the less a win helps, the higher it is. Rough guide only: real spots depend on every stack in the tournament.</p>`;
 }
 
 // ------------------------------------------------------------------ content
@@ -179,30 +194,30 @@ const STACKS = [
     rows: [
       ['Opening', 'Your 80bb charts: UTG 16%, LJ 22%, CO 35%, BTN 54%. Favour suited and connected hands, small pairs and suited aces; open very few offsuit hands outside late position (AKo, AQo, KQo, AJo). The SB mostly limps (83% limp, 8% raise at 80bb).'],
       ['Facing an open', 'Call more in position with suited and connected hands and pairs (BTN flats 16% against a CO open). 3-bet a polarised range: premiums for value, and bluffs that can make strong hands (A5s, A4s, suited connectors). The BB defends about 65% against a BTN open and 3-bets about 16%.'],
-      ['Facing a 3-bet', 'Call wide in position with playable hands (BTN calls 25% of hands against a BB 3-bet at 80bb). Small pairs can call to set-mine. 4-bet small and rarely jam. Against tight players who never 4-bet bluff, KK can just call.'],
+      ['Facing a 3-bet', 'Call wide in position with playable hands (BTN calls 25% of hands against a BB 3-bet at 80bb, including every small pair and suited connector: Figure 4). Small pairs can call to set-mine. 4-bet small and rarely jam. Against tight players who never 4-bet bluff, KK can just call.'],
       ['Postflop', 'Top pair is not a stack-off hand: keep pots small with one pair, and get stacks in with two pair or better. Draws and floats gain value because there is room to bet later streets. Bet sizes must be bigger (pot-sized) to get stacks in by the river.'],
       ['On the bubble', 'Rare this deep, but if you have the big stack, open and 3-bet more against medium stacks who must avoid going broke.'],
     ],
-    practise: [['ranges.html?depth=80&open=LJ&resp=BTN', 'Range viewer: LJ vs BTN at 80bb'], ['preflop.html?depth=80', 'Preflop trainer at 80bb']],
+    practise: [['ranges.html?depth=80&open=LJ&resp=BTN', 'Range viewer: LJ vs BTN at 80bb'], ['preflop.html?depth=80', 'Preflop trainer at 80bb'], ['preflop.html?depth=80&only=vs3bet|BTN', 'BTN facing a 3-bet at 80bb']],
   },
   {
     id: 'mid', band: '40–60bb', title: 'Middle stacks', when: 'Middle stages. Single-raised pot SPR about 8; 3-bet pot SPR about 2.',
     lead: 'Play hands that make <b>strong top pairs</b>. You open about the same number of hands as deep, but swap small pairs and small suited connectors for offsuit Broadways and offsuit aces. A 3-bet pot now commits you with any top pair or overpair.',
     rows: [
-      ['Opening', 'LJ 23%, CO 36%, BTN 52% (Figure 1: 33 and 54s leave the LJ range; A9o and KTo come in). The SB raises more often (19% raise, 68% limp).'],
+      ['Opening', 'LJ 23%, CO 36%, BTN 52% (Figure 2: 33 and 54s leave the LJ range; A9o and KTo come in). The SB raises more often (19% raise, 68% limp).'],
       ['Facing an open', 'The BB calls about 70% and 3-bets about 15% against a BTN open. 3-bet bluffs move to hands that block the 4-bet jam range and flop easy top pairs: KJo, KTo, ATo, A9s–A6s. 3-bet AQ and AJs for value: most players jam AK, so when they just call, your AQ is often best. Flat KQo rather than 3-bet it, to keep dominated KJ and KT in.'],
-      ['Facing a 3-bet', 'Call less and start jamming: against a BB 3-bet the BTN calls 23% and 4-bet jams 4.5%. Don\'t call 3-bets just to set-mine small pairs; the implied odds are gone.'],
+      ['Facing a 3-bet', 'Call less and start jamming: against a BB 3-bet the BTN calls 23% and 4-bet jams 4.5%. Don\'t call 3-bets just to set-mine small pairs: at 50bb your chart 4-bet jams 22 and 33 instead, while 65s and 76s can still call in position (Figure 4).'],
       ['Postflop', 'Single-raised pots (SPR 8): top pair good kicker is strong but needs care against big action; c-bet often and small when you have the range advantage. 3-bet pots (SPR 2): plan to get top pair+ all in. In the solver\'s BB 3-bet vs BTN pot, BTN goes all-in 25–45% of the time facing a ¾-pot bet.'],
       ['On the bubble', 'Most bubbles start around here. Medium stacks must avoid other medium and big stacks; the big stack should pressure them.'],
     ],
-    practise: [['ranges.html?depth=50&open=LJ&resp=BB', 'Range viewer: LJ vs BB at 50bb'], ['preflop.html?depth=50', 'Preflop trainer at 50bb'], ['solver.html?only=bb3-btn-50:vsBig', 'Solver: 3-bet pot, facing a ¾-pot bet']],
+    practise: [['ranges.html?depth=50&open=LJ&resp=BB', 'Range viewer: LJ vs BB at 50bb'], ['preflop.html?depth=50', 'Preflop trainer at 50bb'], ['preflop.html?depth=50&only=vs3bet|BTN', 'BTN facing a 3-bet at 50bb'], ['solver.html?only=bb3-btn-50:vsBig', 'Solver: 3-bet pot, facing a ¾-pot bet']],
   },
   {
     id: 'rejam', band: '20–35bb', title: 'The re-jam zone', when: 'Late-middle stages. Single-raised pot SPR about 3–4.5.',
     lead: 'All-in <b>re-jams</b> (3-bet shoves) replace normal 3-bets, so every open risks being shoved on. Open hands that can either call a jam or fold easily, and use blockers (an ace in your hand) to pick re-jam bluffs.',
     rows: [
       ['Opening', 'Open smaller (2–2.3bb). Early positions barely change (UTG 17–18%), but the BTN tightens (54% at 80bb, 45% at 30bb, 36% at 20bb) because the blinds re-jam. At 20bb your BTN chart open-jams some hands that hate facing a re-jam: 22–44, A2s–A4s, A7o–A8o.'],
-      ['Facing an open', 'Re-jam or call; small 3-bets almost vanish (Figure 2). The BB re-jams 11% against a BTN open at 30bb and 14% at 20bb; the BTN against a CO open goes from 17% flat / 4% jam at 30bb to 9% flat / 11% jam at 20bb.'],
+      ['Facing an open', 'Re-jam or call; small 3-bets almost vanish (Figure 3). The BB re-jams 11% against a BTN open at 30bb and 14% at 20bb; the BTN against a CO open goes from 17% flat / 4% jam at 30bb to 9% flat / 11% jam at 20bb.'],
       ['Facing a 3-bet or jam', 'Calling ranges are much tighter than jamming ranges (the "gap concept"): you need a hand that is ahead of their range, not just a playable one. Against a BB 3-bet the BTN calls 17% at 30bb and 11% at 20bb; facing a BTN open-jam at 20bb, the BB calls about 20%.'],
       ['Postflop', 'SPR 3–4.5: top pair with a good kicker is usually a stack-off hand. Bet small and plan to get it in by the turn: the solver\'s 20bb BTN c-bets ⅓ pot on K-7-2 61% of the time and almost never bets big.'],
       ['On the bubble', 'The hardest zone for ICM: re-jams and calls carry the biggest risk premium. Tighten calls a lot; jam more against medium stacks who can\'t call.'],
@@ -273,13 +288,13 @@ const DISAGREE = [
   ['Min-raise UTG, raise bigger on the BTN (deep)', 'Your charts use one open size per depth (about 2.2–2.3bb).', 'A reasonable exploit at deep, passive tables; not needed to play well.'],
   ['3-bet bluffing against weak players', 'The charts 3-bet a balanced mix of value and bluffs.', 'Against players who never fold to 3-bets (common in small online games), drop the bluffs and 3-bet more value hands.'],
   ['Calling 4-bet jams at 50bb', 'Charts assume opponents jam a balanced range.', 'Against typical small-stakes players, fold AQ, AJs and KQs to a 4-bet jam: they jam only their best hands.'],
-  ['Any bubble or final-table spot', 'Charts are chip EV and ignore payouts.', 'Tighten calls by the risk premium (Figure 5); big stacks open and jam wider than the charts.'],
+  ['Any bubble or final-table spot', 'Charts are chip EV and ignore payouts.', 'Tighten calls by the risk premium (Figure 6); big stacks open and jam wider than the charts.'],
 ];
 
 const MISTAKES = [
-  ['Calling 3-bets with small pairs at 40bb or less.', 'Fold them: set-mining needs about 15–20 times the call behind. Call opens with them only in position or in the big blind.'],
+  ['Calling 3-bets with small pairs at 40bb or less.', 'Fold or jam them: set-mining needs about 15–20 times the call behind, and at 50bb you have about 6× (Figure 4). Call opens with them only in position or in the big blind.'],
   ['Stacking off with one pair when 150bb+ deep.', 'Keep pots small with one pair deep; get it in with two pair or better.'],
-  ['Opening the same hands at every depth.', 'Swap small pairs and small suited connectors for offsuit Broadways as you get shorter (Figure 1).'],
+  ['Opening the same hands at every depth.', 'Swap small pairs and small suited connectors for offsuit Broadways as you get shorter (Figure 2).'],
   ['Making 3-bets you can\'t call a jam with, at 20–35bb.', 'Re-jam or flat instead; small 3-bets with medium hands get shoved on.'],
   ['Min-raising at 15bb, then calling off light.', 'Shove the hands you don\'t want to face a re-jam with; min-raise only hands happy to call or easy to fold.'],
   ['Calling jams as wide as you would shove.', 'Calling needs a hand ahead of their range; your calling range should be clearly tighter than your shoving range.'],
@@ -328,7 +343,7 @@ function guideHTML() {
     <p class="lead">As stacks get shorter you play <b>about the same number of hands but different hands</b>, you need a <b>weaker hand to get all in</b>, and re-raises turn into <b>all-ins</b>. Three forces drive this:</p>
     <ol class="forces">
       <li><b>Implied odds shrink.</b> Small pairs and suited connectors need deep stacks to pay off, so they lose value; big offsuit cards that make top pairs gain it.</li>
-      <li><b>SPR falls.</b> With less behind relative to the pot, one pair becomes strong enough to get all in (Figure 4).</li>
+      <li><b>SPR falls.</b> With less behind relative to the pot, one pair becomes strong enough to get all in (Figure 5).</li>
       <li><b>All-ins take over.</b> Below about 35bb a 3-bet commits you, so re-jams replace 3-bets; blockers and fold equity matter more than playability.</li>
     </ol>
     <p>Always use the <b>effective stack</b>: with 100bb against a 30bb player, play a 30bb hand.</p>
@@ -336,6 +351,7 @@ function guideHTML() {
     ${figValue()}
     ${figLJ()}
     ${figBB()}
+    ${figCall()}
     ${figSPR()}
   </section>
 
