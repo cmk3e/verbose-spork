@@ -181,7 +181,7 @@ The webinar's two baseline examples (with a 1bb ante):
 | --- | --- | --- |
 | Flop | 7.5 / 37.5 / 5 | 7.5 / 97.5 / 13 |
 | Turn (after 5bb flop bet called) | 17.5 / 32 / ~2 | 17.5 / 92.5 / ~5 |
-| River (after 12.5bb turn bet called) | 42 / 20 / ~0.5 | 42 / 86 / ~2 |
+| River (after 12.5bb turn bet called) | 42 / 20 / ~0.5 | 42 / 80 / ~1.9 |
 | Result | Jam the river for half pot; KQ is close to the top of a range that would have raised AQ, sets and two pairs earlier | Can't get stacks in without overbetting; the caller's range is stronger because AQ, sets, two pairs and straights (JTs) could all just call |
 
 Why the same hand is stronger shallow: at low SPR, opponents get their best hands in early (AQ raises or jams, sets and two pairs raise before a scary card), so the hands that just call down are weaker. Deep, they flat more strong hands and float more draws, so the calling range is stronger by the river.
