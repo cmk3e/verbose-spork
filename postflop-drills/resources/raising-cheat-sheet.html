@@ -1,0 +1,92 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Raising cheat sheet</title><style>
+@page { size: Letter; margin: 0.45in 0.45in; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: "Public Sans", "Helvetica Neue", Arial, sans-serif; color: #15211b; font-size: 8.6pt; line-height: 1.4; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+h1 { font-size: 19pt; margin: 0 0 3px; }
+h2 { font-size: 11pt; margin: 10px 0 4px; break-after: avoid; }
+.lead { color: #3b4a42; margin: 0 0 8px; font-size: 9pt; }
+table { width: 100%; border-collapse: collapse; margin: 4px 0 6px; }
+th, td { text-align: left; vertical-align: top; padding: 5px 6px; border-bottom: 1px solid #d3dbd6; }
+thead th { font-size: 7pt; text-transform: uppercase; letter-spacing: .05em; color: #5a6a61; border-bottom: 2px solid #15211b; }
+tbody tr:nth-child(even) td, tbody tr:nth-child(even) th { background: #f4f6f5; }
+table.keep, .stat, .rules { break-inside: avoid; }
+.sub { font-size: 7.4pt; color: #5a6a61; margin-top: 2px; }
+.key { display: flex; flex-wrap: wrap; gap: 12px; font-size: 7.6pt; color: #3b4a42; margin: 2px 0 8px; }
+.key i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 3px; vertical-align: -1px; border: 1px solid #ccd3cf; }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+ul, ol { margin: 2px 0 6px; padding-left: 16px; } li { margin-bottom: 3px; }
+.small { font-size: 7.8pt; color: #3b4a42; margin: 3px 0; }
+.src { font-size: 7pt; color: #7a8780; margin-top: 10px; }
+
+  .sh { color: #c4302b; } .sd { color: #1f5fbf; } .sc { color: #217a3c; } .ss { color: #1b1f1d; }
+  .fb { display: inline-flex; width: 110px; height: 8px; border-radius: 3px; overflow: hidden; background: #eef1ef; vertical-align: middle; }
+  .fb .r { background: #e5483f; } .fb .c { background: #4cae62; }
+  table.fine td, table.fine th { padding: 2.5px 6px; }
+  .n { text-align: right; font-variant-numeric: tabular-nums; }
+  .stat { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 6px 0 10px; }
+  .stat div { background: #f4f6f5; border-radius: 6px; padding: 6px 8px; }
+  .stat b { display: block; font-size: 15pt; color: #8f1f1a; }
+  .stat span { font-size: 7.6pt; color: #3b4a42; }
+  .rules { background: #eaf2ee; border-radius: 8px; padding: 6px 12px; }
+  .rules li { margin-bottom: 3px; }
+  .page2 { break-before: page; }
+  </style></head><body>
+  <h1>When to raise on the flop and turn</h1>
+  <p class="lead">From every solved spot on the site (13 flop spots × 30 flops, plus 79 turns in BTN vs BB). "Raise" includes check-raises. Percentages are how often the solver raises when facing a bet, weighted by how often each hand gets there.</p>
+
+  <div class="stat">
+    <div><b>20%</b><span>BB check-raises a ⅓-pot c-bet (50bb, vs UTG–BTN)</span></div>
+    <div><b>9%</b><span>BB check-raises a ¾-pot c-bet</span></div>
+    <div><b>16%</b><span>In-position caller raises a ⅓-pot c-bet (BB vs SB, BTN vs CO)</span></div>
+    <div><b>16%</b><span>Caller raises in 3-bet pots (low SPR)</span></div>
+    <div><b>15%</b><span>Preflop raiser check-raises out of position</span></div>
+    <div><b>35%</b><span>Preflop raiser raises a small donk lead (leads are rare and capped)</span></div>
+    <div><b>13%</b><span>BB check-raises a ⅓-pot turn bet (6% vs ¾, 3% vs an overbet)</span></div>
+    <div><b>3×</b><span>Raise size: about 3× the bet on both streets (⅓ pot → raise to about a full pot)</span></div>
+  </div>
+
+  <div class="rules"><h2>Rules of thumb</h2><ol>
+    <li><b>Raise small bets, call big ones.</b> Against ⅓ pot the BB check-raises about 20%; against ¾ pot only about 9%. A big bet already gets folds, and it means the bettor holds more strong hands.</li>
+    <li><b>Out of position, raise; in position, call.</b> Flush draws check-raise 29% out of position but raise only 6% in position. In position you see every turn and river for the price of a call.</li>
+    <li><b>Raise with the top and with strong draws; call with the middle.</b> Two pair or better raises 67%, open-enders 30%, but top pair with a weak kicker raises only 14% and weak pairs 12%. Middle hands beat bluffs but hate a re-raise.</li>
+    <li><b>Raise more on boards that help the caller.</b> Low and paired boards, where the big blind holds more sets, two pairs and straights.</li>
+    <li><b>Shorter stacks: raise-or-fold with top pair.</b> At 20bb top pair with a good kicker check-raises 65% (vs 50% at 50bb): a raise is close to all in, so get it in now.</li>
+    <li><b>On the turn, raise less and bluff less.</b> With one card to come, draws are worth less: the BB check-raises the turn about half as often as the flop, mostly with two pair or better.</li>
+  </ol></div>
+
+  <h2>Which hands the big blind check-raises (flop, 50bb, vs UTG/HJ/CO/BTN c-bets)</h2>
+  <table class="fine keep"><thead><tr><th>Hand</th><th>Raise</th><th>Call</th><th>Fold</th><th></th></tr></thead><tbody><tr><td>Sets, two pair, straights, flushes</td><td class="n"><b>67%</b></td><td class="n">33%</td><td class="n">0%</td><td><span class="fb"><i class="r" style="width:67.11174548391594%"></i><i class="c" style="width:32.887104595592035%"></i></span></td></tr><tr><td>Overpairs</td><td class="n"><b>52%</b></td><td class="n">47%</td><td class="n">1%</td><td><span class="fb"><i class="r" style="width:52.05230389467902%"></i><i class="c" style="width:47.20194733955021%"></i></span></td></tr><tr><td>Top pair, J+ kicker</td><td class="n"><b>38%</b></td><td class="n">61%</td><td class="n">0%</td><td><span class="fb"><i class="r" style="width:38.41543887683772%"></i><i class="c" style="width:61.44036006705503%"></i></span></td></tr><tr><td>Combo draws</td><td class="n"><b>37%</b></td><td class="n">62%</td><td class="n">0%</td><td><span class="fb"><i class="r" style="width:37.44499981069668%"></i><i class="c" style="width:62.40362360991148%"></i></span></td></tr><tr><td>Open-ended straight draws</td><td class="n"><b>30%</b></td><td class="n">61%</td><td class="n">9%</td><td><span class="fb"><i class="r" style="width:30.081229584045076%"></i><i class="c" style="width:61.18796353142679%"></i></span></td></tr><tr><td>Flush draws</td><td class="n"><b>29%</b></td><td class="n">55%</td><td class="n">16%</td><td><span class="fb"><i class="r" style="width:28.843835288643433%"></i><i class="c" style="width:55.1227528172598%"></i></span></td></tr><tr><td>Gutshots</td><td class="n"><b>22%</b></td><td class="n">40%</td><td class="n">38%</td><td><span class="fb"><i class="r" style="width:22.49536365263834%"></i><i class="c" style="width:39.60225911422267%"></i></span></td></tr><tr><td>Pair + strong draw</td><td class="n"><b>17%</b></td><td class="n">82%</td><td class="n">0%</td><td><span class="fb"><i class="r" style="width:17.288766658390042%"></i><i class="c" style="width:82.23087838042655%"></i></span></td></tr><tr><td>Top pair, weak kicker</td><td class="n"><b>14%</b></td><td class="n">85%</td><td class="n">1%</td><td><span class="fb"><i class="r" style="width:14.25418070246551%"></i><i class="c" style="width:84.98566435622695%"></i></span></td></tr><tr><td>Middle, bottom and under pairs</td><td class="n"><b>12%</b></td><td class="n">67%</td><td class="n">21%</td><td><span class="fb"><i class="r" style="width:12.102668965365217%"></i><i class="c" style="width:67.33523848794783%"></i></span></td></tr><tr><td>Ace high (AT+)</td><td class="n"><b>8%</b></td><td class="n">54%</td><td class="n">38%</td><td><span class="fb"><i class="r" style="width:7.677841399106225%"></i><i class="c" style="width:54.361518268077624%"></i></span></td></tr><tr><td>Backdoor draws only</td><td class="n"><b>13%</b></td><td class="n">12%</td><td class="n">76%</td><td><span class="fb"><i class="r" style="width:12.510711908285774%"></i><i class="c" style="width:11.681228252734241%"></i></span></td></tr><tr><td>Air (nothing)</td><td class="n"><b>2%</b></td><td class="n">4%</td><td class="n">95%</td><td><span class="fb"><i class="r" style="width:1.583163908426406%"></i><i class="c" style="width:3.55275531970141%"></i></span></td></tr></tbody></table>
+  <div class="key"><span><i style="background:#e5483f"></i>Raise</span><span><i style="background:#4cae62"></i>Call</span><span><i style="background:#eef1ef"></i>Fold</span><span>On paired boards, "middle pairs" include hands like 4x on 9-9-4, which check-raise about half the time; elsewhere weak pairs raise under 10%.</span></div>
+
+  <section class="page2">
+  <div class="cols">
+    <div>
+      <h2>Which boards: BB check-raise vs ⅓ pot</h2>
+      <table class="keep"><thead><tr><th>Flop</th><th>Raise</th><th></th></tr></thead><tbody><tr><td>8-high or lower</td><td class="n"><b>24%</b></td><td><span class="fb"><i class="r" style="width:24.180057472641263%"></i><i class="c" style="width:43.679262508020976%"></i></span></td></tr><tr><td>Paired</td><td class="n"><b>27%</b></td><td><span class="fb"><i class="r" style="width:26.69728001029487%"></i><i class="c" style="width:16.843614300088394%"></i></span></td></tr><tr><td>9 to J high</td><td class="n"><b>20%</b></td><td><span class="fb"><i class="r" style="width:20.34055034581366%"></i><i class="c" style="width:41.119768437038%"></i></span></td></tr><tr><td>Monotone</td><td class="n"><b>17%</b></td><td><span class="fb"><i class="r" style="width:16.680553581940654%"></i><i class="c" style="width:45.2987472239785%"></i></span></td></tr><tr><td>Q-high or higher</td><td class="n"><b>16%</b></td><td><span class="fb"><i class="r" style="width:16.014890153167162%"></i><i class="c" style="width:37.47291972533789%"></i></span></td></tr></tbody></table>
+      <p class="small">Most (BTN vs BB): 9<span class="ss">♠</span>9<span class="sh">♥</span>4<span class="sh">♥</span> 32% · 7<span class="sd">♦</span>7<span class="sc">♣</span>2<span class="ss">♠</span> 31% · 6<span class="ss">♠</span>4<span class="sd">♦</span>3<span class="sc">♣</span> 29% · K<span class="ss">♠</span>K<span class="sd">♦</span>4<span class="sh">♥</span> 27%<br>Least: A<span class="sh">♥</span>K<span class="sd">♦</span>5<span class="sc">♣</span> 11% · A<span class="ss">♠</span>J<span class="sh">♥</span>9<span class="ss">♠</span> 12% · A<span class="ss">♠</span>Q<span class="ss">♠</span>6<span class="sd">♦</span> 13% · K<span class="ss">♠</span>J<span class="ss">♠</span>8<span class="ss">♠</span> 14%</p>
+      <p class="small">Ace- and king-high boards hit the raiser's range (AK, AQ, KQ, big pairs). Low and paired boards hit the big blind's suited connectors, small pairs and trips.</p>
+    </div>
+    <div>
+      <h2>Stack depth (BTN vs BB, check-raise)</h2>
+      <table class="keep"><thead><tr><th>Hand</th><th>50bb</th><th>30bb</th><th>20bb</th></tr></thead><tbody>
+        <tr><td>Sets, two pair, straights, flushes</td><td class="n">69%</td><td class="n">49%</td><td class="n">32%</td></tr><tr><td>Top pair, J+ kicker</td><td class="n">50%</td><td class="n">65%</td><td class="n">65%</td></tr><tr><td>Top pair, weak kicker</td><td class="n">17%</td><td class="n">35%</td><td class="n">50%</td></tr><tr><td>Flush draws</td><td class="n">27%</td><td class="n">27%</td><td class="n">20%</td></tr><tr><td>Open-ended straight draws</td><td class="n">30%</td><td class="n">20%</td><td class="n">15%</td></tr><tr><td>Gutshots</td><td class="n">21%</td><td class="n">15%</td><td class="n">11%</td></tr>
+      </tbody></table>
+      <p class="small">Shallow, one-pair hands turn into raises: a check-raise puts you close to all in, so you take the money now. Draws and gutshots raise less, because a bluff-raise can't fold anyone out with so little behind. Sets and two pair raise less too: the stack goes in later anyway, so they let the button keep betting.</p>
+    </div>
+  </div>
+
+  <div class="cols">
+    <div>
+      <h2>3-bet pots (caller, 50bb, SPR about 2–3)</h2>
+      <table class="fine keep"><thead><tr><th>Hand</th><th>Raise</th><th>Call</th><th>Fold</th><th></th></tr></thead><tbody><tr><td>Sets, two pair, straights, flushes</td><td class="n"><b>22%</b></td><td class="n">76%</td><td class="n">2%</td><td><span class="fb"><i class="r" style="width:22.028912761431265%"></i><i class="c" style="width:75.79452947434669%"></i></span></td></tr><tr><td>Overpairs</td><td class="n"><b>33%</b></td><td class="n">61%</td><td class="n">6%</td><td><span class="fb"><i class="r" style="width:33.005499836658615%"></i><i class="c" style="width:61.028504485979965%"></i></span></td></tr><tr><td>Top pair, J+ kicker</td><td class="n"><b>44%</b></td><td class="n">49%</td><td class="n">7%</td><td><span class="fb"><i class="r" style="width:43.959697626387786%"></i><i class="c" style="width:49.28650848854669%"></i></span></td></tr><tr><td>Top pair, weak kicker</td><td class="n"><b>32%</b></td><td class="n">64%</td><td class="n">4%</td><td><span class="fb"><i class="r" style="width:32.136470732845304%"></i><i class="c" style="width:63.688858283444425%"></i></span></td></tr><tr><td>Combo draws</td><td class="n"><b>51%</b></td><td class="n">36%</td><td class="n">13%</td><td><span class="fb"><i class="r" style="width:51.21085814360769%"></i><i class="c" style="width:35.63718622300055%"></i></span></td></tr><tr><td>Pair + strong draw</td><td class="n"><b>42%</b></td><td class="n">48%</td><td class="n">11%</td><td><span class="fb"><i class="r" style="width:41.753134453069684%"></i><i class="c" style="width:47.519102468942584%"></i></span></td></tr><tr><td>Flush draws</td><td class="n"><b>39%</b></td><td class="n">53%</td><td class="n">9%</td><td><span class="fb"><i class="r" style="width:38.86451461725707%"></i><i class="c" style="width:52.61205999436902%"></i></span></td></tr><tr><td>Open-ended straight draws</td><td class="n"><b>19%</b></td><td class="n">66%</td><td class="n">15%</td><td><span class="fb"><i class="r" style="width:19.12498317491316%"></i><i class="c" style="width:65.86630464509588%"></i></span></td></tr><tr><td>Middle, bottom and under pairs</td><td class="n"><b>14%</b></td><td class="n">55%</td><td class="n">31%</td><td><span class="fb"><i class="r" style="width:13.908425177554587%"></i><i class="c" style="width:55.21043313691173%"></i></span></td></tr><tr><td>Ace high (AT+)</td><td class="n"><b>13%</b></td><td class="n">53%</td><td class="n">34%</td><td><span class="fb"><i class="r" style="width:13.184477528575028%"></i><i class="c" style="width:53.185982796194445%"></i></span></td></tr></tbody></table>
+      <p class="small">With so little behind, top pair and good draws raise much more (top pair, good kicker 44%). The stack goes in on the flop, so raising gets your equity in before a scary turn. Sets and two pair often just call to keep bluffs in.</p>
+    </div>
+    <div>
+      <h2>Turn check-raises (BTN vs BB, ⅓ c-bet called)</h2>
+      <table class="fine keep"><thead><tr><th>Hand</th><th>Raise</th><th>Call</th><th>Fold</th><th></th></tr></thead><tbody><tr><td>Sets, two pair, straights, flushes</td><td class="n"><b>16%</b></td><td class="n">69%</td><td class="n">15%</td><td><span class="fb"><i class="r" style="width:15.905490778550217%"></i><i class="c" style="width:68.64998467625325%"></i></span></td></tr><tr><td>Top pair, J+ kicker</td><td class="n"><b>47%</b></td><td class="n">46%</td><td class="n">6%</td><td><span class="fb"><i class="r" style="width:47.378692616273845%"></i><i class="c" style="width:46.25173173767042%"></i></span></td></tr><tr><td>Combo draws</td><td class="n"><b>43%</b></td><td class="n">42%</td><td class="n">15%</td><td><span class="fb"><i class="r" style="width:43.385822620544204%"></i><i class="c" style="width:41.86634307336689%"></i></span></td></tr><tr><td>Flush draws</td><td class="n"><b>23%</b></td><td class="n">53%</td><td class="n">24%</td><td><span class="fb"><i class="r" style="width:23.26571804091236%"></i><i class="c" style="width:53.118812394523864%"></i></span></td></tr><tr><td>Open-ended straight draws</td><td class="n"><b>15%</b></td><td class="n">17%</td><td class="n">68%</td><td><span class="fb"><i class="r" style="width:14.50365202715018%"></i><i class="c" style="width:17.463404762215834%"></i></span></td></tr><tr><td>Top pair, weak kicker</td><td class="n"><b>11%</b></td><td class="n">87%</td><td class="n">3%</td><td><span class="fb"><i class="r" style="width:10.958986914708765%"></i><i class="c" style="width:86.53636229586967%"></i></span></td></tr><tr><td>Gutshots</td><td class="n"><b>8%</b></td><td class="n">15%</td><td class="n">77%</td><td><span class="fb"><i class="r" style="width:7.9408670247905055%"></i><i class="c" style="width:15.370195954787386%"></i></span></td></tr><tr><td>Middle, bottom and under pairs</td><td class="n"><b>2%</b></td><td class="n">55%</td><td class="n">43%</td><td><span class="fb"><i class="r" style="width:1.5479374733550841%"></i><i class="c" style="width:55.34666182955482%"></i></span></td></tr><tr><td>Ace high (AT+)</td><td class="n"><b>1%</b></td><td class="n">48%</td><td class="n">51%</td><td><span class="fb"><i class="r" style="width:0.8768786309121998%"></i><i class="c" style="width:48.37244546417964%"></i></span></td></tr><tr><td>Air (nothing)</td><td class="n"><b>2%</b></td><td class="n">11%</td><td class="n">88%</td><td><span class="fb"><i class="r" style="width:1.7016066877273406%"></i><i class="c" style="width:10.686625426856825%"></i></span></td></tr></tbody></table>
+      <p class="small">Two pair or better makes up nearly half of all turn check-raises. Weak pairs and ace high almost never raise the turn. Turns that add straight draws or overcards get slightly more raises; turns that pair the board get the fewest.</p>
+    </div>
+  </div>
+  <p class="src">Solver: postflop-solver, 50/30/20bb, ⅓- and ¾-pot c-bets (turn: ⅓, ¾, 125%), raises of about 3×. Hand groups follow the solver drill's hand labels.</p>
+  </section>
+  </body></html>

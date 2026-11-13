@@ -1,0 +1,92 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Preflop sizing chart</title><style>
+@page { size: Letter; margin: 0.45in 0.45in; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: "Public Sans", "Helvetica Neue", Arial, sans-serif; color: #15211b; font-size: 8.6pt; line-height: 1.4; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+h1 { font-size: 19pt; margin: 0 0 3px; }
+h2 { font-size: 11pt; margin: 10px 0 4px; break-after: avoid; }
+.lead { color: #3b4a42; margin: 0 0 8px; font-size: 9pt; }
+table { width: 100%; border-collapse: collapse; margin: 4px 0 6px; }
+th, td { text-align: left; vertical-align: top; padding: 5px 6px; border-bottom: 1px solid #d3dbd6; }
+thead th { font-size: 7pt; text-transform: uppercase; letter-spacing: .05em; color: #5a6a61; border-bottom: 2px solid #15211b; }
+tbody tr:nth-child(even) td, tbody tr:nth-child(even) th { background: #f4f6f5; }
+table.keep, .stat, .rules { break-inside: avoid; }
+.sub { font-size: 7.4pt; color: #5a6a61; margin-top: 2px; }
+.key { display: flex; flex-wrap: wrap; gap: 12px; font-size: 7.6pt; color: #3b4a42; margin: 2px 0 8px; }
+.key i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 3px; vertical-align: -1px; border: 1px solid #ccd3cf; }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+ul, ol { margin: 2px 0 6px; padding-left: 16px; } li { margin-bottom: 3px; }
+.small { font-size: 7.8pt; color: #3b4a42; margin: 3px 0; }
+.src { font-size: 7pt; color: #7a8780; margin-top: 10px; }
+
+  table.size th:first-child { width: 4.2em; }
+  table.size td { width: 18%; }
+  table.size td.why { width: 22%; color: #3b4a42; }
+  .depth { display: inline-block; background: #1d5640; color: #fff; font-weight: 800; border-radius: 6px; padding: 2px 7px; }
+  .bar { display: flex; height: 7px; border-radius: 3px; overflow: hidden; margin-top: 5px; background: #eef1ef; }
+  .bar .jam { background: #8f1f1a; } .bar .sm { background: #e5483f; opacity: .45; }
+  .bl { font-size: 7.2pt; color: #5a6a61; }
+  .na { font-size: 7.2pt; color: #a0aaa5; }
+  </style></head><body>
+  <h1>Preflop raise sizing by stack depth</h1>
+  <p class="lead">How big to open, 3-bet and 4-bet at 80, 50, 30, 20 and 12bb (8-max, 1bb big-blind ante). The bars show how often your charts make that raise all in rather than a smaller raise.</p>
+  <table class="size keep"><thead><tr><th>Stack</th><th>Open (folded to you)</th><th>3-bet in position</th><th>3-bet from the blinds</th><th>4-bet</th><th>Why</th></tr></thead><tbody><tr>
+      <th><span class="depth">80bb</span></th>
+      <td><b>2.3bb</b><div class="sub">SB vs BB: 3.5bb</div></td>
+      <td>3× the open (about 7bb)<div class="mini"><div class="bar" title="in position"><i class="jam" style="width:0%"></i><i class="sm" style="width:100%"></i></div><span class="bl">0% all in</span></div></td>
+      <td>4× (about 9–9.5bb); vs an SB open, about 3× (10–11bb)<div class="mini"><div class="bar" title="from the blinds"><i class="jam" style="width:0%"></i><i class="sm" style="width:100%"></i></div><span class="bl">0% all in</span></div></td>
+      <td>About 2.2× the 3-bet in position, 2.5× out of position (about 16–22bb)<div class="mini"><div class="bar" title="4-bets"><i class="jam" style="width:11%"></i><i class="sm" style="width:89%"></i></div><span class="bl">11% all in</span></div></td>
+      <td class="why">Deep enough to 3-bet and 4-bet small. Stacks go in later, after the flop.<div class="sub">Called 3-bet SPR: about 4.4 in position, 3.6 from the BB</div></td>
+    </tr><tr>
+      <th><span class="depth">50bb</span></th>
+      <td><b>2.2bb</b><div class="sub">SB vs BB: 3.5bb</div></td>
+      <td>3× (6.6bb)<div class="mini"><div class="bar" title="in position"><i class="jam" style="width:0%"></i><i class="sm" style="width:100%"></i></div><span class="bl">0% all in</span></div></td>
+      <td>4× (8.8bb); vs an SB open, about 3× (10.5bb)<div class="mini"><div class="bar" title="from the blinds"><i class="jam" style="width:1%"></i><i class="sm" style="width:99%"></i></div><span class="bl">1% all in</span></div></td>
+      <td>All in, or a small 4-bet of about 2.2× (15bb) that commits you anyway<div class="mini"><div class="bar" title="4-bets"><i class="jam" style="width:49%"></i><i class="sm" style="width:51%"></i></div><span class="bl">49% all in</span></div></td>
+      <td class="why">The sizes the 50bb solver spots use. A called 3-bet leaves SPR under 3: top pair is usually good enough to get it in.<div class="sub">Called 3-bet SPR: about 2.8 in position, 2.2 from the BB</div></td>
+    </tr><tr>
+      <th><span class="depth">30bb</span></th>
+      <td><b>2.3bb</b><div class="sub">SB vs BB: 3.2bb</div></td>
+      <td>About 2.5× (5.5–6bb), or all in<div class="mini"><div class="bar" title="in position"><i class="jam" style="width:11%"></i><i class="sm" style="width:89%"></i></div><span class="bl">11% all in</span></div></td>
+      <td>About 3× (7bb), or all in<div class="mini"><div class="bar" title="from the blinds"><i class="jam" style="width:46%"></i><i class="sm" style="width:54%"></i></div><span class="bl">46% all in</span></div></td>
+      <td>Always all in<div class="mini"><div class="bar" title="4-bets"><i class="jam" style="width:100%"></i><i class="sm" style="width:0%"></i></div><span class="bl">100% all in</span></div></td>
+      <td class="why">A small 3-bet already commits about a fifth of your stack, so many 3-bets from the blinds are simply all in.<div class="sub">Called 3-bet SPR: about 1.7 in position, 1.5 from the BB</div></td>
+    </tr><tr>
+      <th><span class="depth">20bb</span></th>
+      <td><b>2bb (min-raise); some all-in opens late</b><div class="sub">SB vs BB: 3bb</div><div class="sub">8% of opens are all in</div></td>
+      <td>Almost always all in<div class="mini"><div class="bar" title="in position"><i class="jam" style="width:85%"></i><i class="sm" style="width:15%"></i></div><span class="bl">85% all in</span></div></td>
+      <td>Mostly all in; a few small 3-bets (about 5bb) from the big blind<div class="mini"><div class="bar" title="from the blinds"><i class="jam" style="width:82%"></i><i class="sm" style="width:18%"></i></div><span class="bl">82% all in</span></div></td>
+      <td>Always all in<div class="mini"><div class="bar" title="4-bets"><i class="jam" style="width:100%"></i><i class="sm" style="width:0%"></i></div><span class="bl">100% all in</span></div></td>
+      <td class="why">Re-jam territory. A non-all-in 3-bet leaves too little behind to fold.</td>
+    </tr><tr>
+      <th><span class="depth">12bb</span></th>
+      <td><b>Min-raise (2bb) or all in</b><div class="sub">SB vs BB: Limp or all in</div><div class="sub">66% of opens are all in</div></td>
+      <td>All in<div class="mini"><div class="bar" title="in position"><i class="jam" style="width:100%"></i><i class="sm" style="width:0%"></i></div><span class="bl">100% all in</span></div></td>
+      <td>All in<div class="mini"><div class="bar" title="from the blinds"><i class="jam" style="width:100%"></i><i class="sm" style="width:0%"></i></div><span class="bl">100% all in</span></div></td>
+      <td>n/a<div class="mini"><span class="na">n/a</span></div></td>
+      <td class="why">Push/fold: every re-raise is all in. See the 12bb push/fold charts.</td>
+    </tr></tbody></table>
+  <div class="key"><span><i style="background:#8f1f1a"></i>All-in share</span><span><i style="background:#e5483f;opacity:.45"></i>Smaller raise</span></div>
+
+  <div class="cols">
+    <div>
+      <h2>Adjustments</h2>
+      <ul>
+        <li><b>Limpers:</b> add 1bb to your open for each limper.</li>
+        <li><b>Squeeze</b> (open plus callers): your normal 3-bet plus one open-size for each caller. At 30bb and below, squeeze all in.</li>
+        <li><b>Out of position, go bigger:</b> 3-bet about 4× from the blinds vs 3× in position, so the caller pays more to play the hand with position.</li>
+        <li><b>Short stack behind you:</b> at 20–25bb, prefer a min-raise you can fold to a re-jam, or open-jam, over a big open you are committed to.</li>
+        <li><b>Effective stack:</b> size for the smaller stack in the hand, not your own.</li>
+      </ul>
+    </div>
+    <div>
+      <h2>Why sizes shrink as stacks shrink</h2>
+      <ul>
+        <li>Opens stay about 2–2.3bb at every depth; what changes is the 3-bet.</li>
+        <li>A 3-bet is a share of your stack: 7bb is 9% of 80bb but 23% of 30bb. Once a 3-bet costs a fifth of your stack, you can't fold to a jam, so the solver jams instead.</li>
+        <li>That is why the all-in share jumps from about 0% at 50bb to about a third at 30bb and most 3-bets at 20bb.</li>
+        <li>4-bets go all in from about 50bb: a 4-bet to 15bb leaves too little behind to fold.</li>
+      </ul>
+    </div>
+  </div>
+  <p class="src">Opens, SB sizes and all-in shares: your PokerCoaching charts. Your charts don't list 3-bet and 4-bet sizes, so the bb amounts are standard sizes (the 50bb solver spots use 6.6bb in position and 8.8bb from the blinds).</p>
+  </body></html>
