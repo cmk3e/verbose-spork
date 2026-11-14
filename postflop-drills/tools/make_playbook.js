@@ -4,7 +4,7 @@
  * writes resources/roundup-main-playbook.html and .pdf
  *
  * Event facts from public listings (CardPlayer, Wildhorse's 2026 fall packet as quoted by search):
- * $550 main, 2 days, 25,000 chips, 60-minute levels, late reg through level 6, one re-entry
+ * $550 main, 2 days, 25,000 chips + 5,000 dealer-appreciation add-on = 30,000, 60-minute levels, late reg through level 6, one re-entry
  * before level 4, Day 1 plays to the money bubble, Day 2 restarts 11am Nov 15.
  * The blind schedule is Wildhorse's posted Round Up structure (spring 2026 sheet); the
  * fall sheet could not be fetched, so the page says to confirm it at the desk.
@@ -14,7 +14,7 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const OUT = path.join(ROOT, 'resources');
 
-const STACK = 25000;
+const STACK = 30000;
 const LEVELS = [
   [1, 100, 200, 200], [2, 150, 300, 300], [3, 200, 400, 400], [4, 300, 600, 600], [5, 400, 800, 800],
   [6, 500, 1000, 1000], [7, 600, 1200, 1200], [8, 800, 1600, 1600], [9, 1000, 2000, 2000], [10, 1500, 3000, 3000],
@@ -62,11 +62,11 @@ ul { margin: 0 0 3px; padding-left: 13px; } li { margin-bottom: 1.6px; }
 const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Round Up main event playbook</title><style>${CSS}</style></head><body>
 <div class="top">
   <div><h1>Main Event Playbook · Fall Poker Round Up</h1><div class="m">Wildhorse Resort &amp; Casino, Pendleton · $550 NLH · Day 1 Sat Nov 14 · Day 2 Sun Nov 15, 11am</div></div>
-  <div class="facts">25,000 chips · 60-min levels · big-blind ante<br>Late reg through level 6 · one re-entry before level 4<br>Day 1 plays to the money bubble: everyone who bags is paid</div>
+  <div class="facts">30k chips (25k + 5k dealer add-on) · 60-min levels<br>Late reg through level 6 · one re-entry before level 4<br>Day 1 plays to the money bubble: everyone who bags is paid</div>
 </div>
 <div class="grid">
 <div>
-  <h2>Your stack by level (if you hold 25k)</h2>
+  <h2>Your stack by level (if you hold 30k)</h2>
   <table><thead><tr><th>Lvl</th><th>Blinds (BB ante)</th><th>Stack</th><th>Phase · use</th><th>Notes</th></tr></thead><tbody>${rows}</tbody></table>
   <p class="m" style="margin:2px 0 0">Blinds from Wildhorse's posted Round Up structure; confirm the fall sheet at the desk. Always count your stack in big blinds against the <b>effective</b> stack.</p>
 
@@ -111,10 +111,10 @@ const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>
 
   <h2>Game plan</h2>
   <div class="box"><ul>
-    <li><b>Register by level 3</b> to play 60–125bb deep, your biggest edge with 60-minute levels. Entering at level 7 is about 21bb.</li>
-    <li><b>Re-entry:</b> only before level 4. If you bust early, re-enter; you still start with 60bb or more.</li>
+    <li><b>Register by level 3</b> to play 75–150bb deep, your biggest edge with 60-minute levels. Entering at level 7 is 25bb. Take the dealer add-on: 5k chips is 20% more stack.</li>
+    <li><b>Re-entry:</b> only before level 4. If you bust early, re-enter; you still start with 75bb or more.</li>
     <li><b>Levels 1–4:</b> low-risk, see flops, value-bet weak players. Avoid stacking off with one pair deep (SPR &gt; 5).</li>
-    <li><b>Levels 5–8:</b> stacks drop to 20–40bb; steal and re-jam. Antes make every orbit costly: 1.5bb + 1bb ante.</li>
+    <li><b>Levels 5–8:</b> stacks drop to about 20–40bb; steal and re-jam. Antes make every orbit costly: 1.5bb + 1bb ante.</li>
     <li><b>Levels 9+:</b> push/fold and bubble rules. Bag chips; Day 2 restarts at 11am.</li>
     <li>Eat at the dinner break, hydrate, and review a few hands each break: what did they show down?</li>
   </ul></div>
